@@ -3987,8 +3987,7 @@ dbglog_wow_print_handler(
 	case WOW_NS_OFLD_ENABLE:
 		if (4 == numargs) {
 			dbglog_printf(timestamp, vap_id,
-                "Enable NS offload, for sender %02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x\
-                :%02x%02x:%02x%02x:%02x%02x",
+                "Enable NS offload, for sender %02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
 				      *(A_UINT8*)&args[0], *((A_UINT8*)&args[0]+1), *((A_UINT8*)&args[0]+2), *((A_UINT8*)&args[0]+3),
 				      *(A_UINT8*)&args[1], *((A_UINT8*)&args[1]+1), *((A_UINT8*)&args[1]+2), *((A_UINT8*)&args[1]+3),
 				      *(A_UINT8*)&args[2], *((A_UINT8*)&args[2]+1), *((A_UINT8*)&args[2]+2), *((A_UINT8*)&args[2]+3),
@@ -4016,8 +4015,7 @@ dbglog_wow_print_handler(
 	case WOW_NS_RECEIVED:
 		if (4 == numargs) {
 			dbglog_printf(timestamp, vap_id,
-                "NS requested from %02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x\
-                :%02x%02x:%02x%02x:%02x%02x",
+				      "NS requested from %02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
 				      *(A_UINT8*)&args[0], *((A_UINT8*)&args[0]+1), *((A_UINT8*)&args[0]+2), *((A_UINT8*)&args[0]+3),
 				      *(A_UINT8*)&args[1], *((A_UINT8*)&args[1]+1), *((A_UINT8*)&args[1]+2), *((A_UINT8*)&args[1]+3),
 				      *(A_UINT8*)&args[2], *((A_UINT8*)&args[2]+1), *((A_UINT8*)&args[2]+2), *((A_UINT8*)&args[2]+3),
@@ -4029,8 +4027,7 @@ dbglog_wow_print_handler(
 	case WOW_NS_REPLIED:
 		if (4 == numargs) {
 			dbglog_printf(timestamp, vap_id,
-                "NS replied to %02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x\
-                :%02x%02x:%02x%02x:%02x%02x",
+				      "NS replied to %02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
 				      *(A_UINT8*)&args[0], *((A_UINT8*)&args[0]+1), *((A_UINT8*)&args[0]+2), *((A_UINT8*)&args[0]+3),
 				      *(A_UINT8*)&args[1], *((A_UINT8*)&args[1]+1), *((A_UINT8*)&args[1]+2), *((A_UINT8*)&args[1]+3),
 				      *(A_UINT8*)&args[2], *((A_UINT8*)&args[2]+1), *((A_UINT8*)&args[2]+2), *((A_UINT8*)&args[2]+3),
