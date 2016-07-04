@@ -67,6 +67,9 @@
 #ifdef IPA_OFFLOAD
 #include <wlan_hdd_ipa.h>
 #endif
+
+#include <compat-qcacld.h>
+
 v_BOOL_t mibIsDot11DesiredBssTypeInfrastructure( hdd_adapter_t *pAdapter );
 
 struct ether_addr
@@ -979,11 +982,19 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
             /* To avoid wpa_supplicant sending "HANGED" CMD to ICS UI */
             if( eCSR_ROAM_LOSTLINK == roamStatus )
             {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0))
+                cfg80211_disconnected(dev, pRoamInfo->reasonCode, NULL, 0, true, GFP_KERNEL);
+#else
                 cfg80211_disconnected(dev, pRoamInfo->reasonCode, NULL, 0, GFP_KERNEL);
+#endif
             }
             else
             {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0))
+                cfg80211_disconnected(dev, WLAN_REASON_UNSPECIFIED, NULL, 0, true, GFP_KERNEL);
+#else
                 cfg80211_disconnected(dev, WLAN_REASON_UNSPECIFIED, NULL, 0, GFP_KERNEL);
+#endif
             }
 
             //If the Device Mode is Station
@@ -1881,6 +1892,10 @@ static void hdd_RoamIbssIndicationHandler( hdd_adapter_t *pAdapter,
                                            eRoamCmdStatus roamStatus,
                                            eCsrRoamResult roamResult )
 {
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,1,0))
+    struct ieee80211_channel *chan;
+#endif
    hddLog(VOS_TRACE_LEVEL_INFO, "%s: %s: id %d, status %d, result %d",
           __func__, pAdapter->dev->name, roamId, roamStatus, roamResult);
 
@@ -1934,7 +1949,12 @@ static void hdd_RoamIbssIndicationHandler( hdd_adapter_t *pAdapter,
                return;
             }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0))
             cfg80211_ibss_joined(pAdapter->dev, bss->bssid, GFP_KERNEL);
+#else
+            chan = ieee80211_get_channel(pAdapter->wdev.wiphy, (int) pRoamInfo->pBssDesc->channelId);
+            cfg80211_ibss_joined(pAdapter->dev, bss->bssid, chan, GFP_KERNEL);
+#endif
             cfg80211_put_bss(
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
                              pHddCtx->wiphy,

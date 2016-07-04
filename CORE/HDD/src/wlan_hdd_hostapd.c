@@ -707,8 +707,12 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
     v_BOOL_t bWPSState;
     v_BOOL_t bAuthRequired = TRUE;
     tpSap_AssocMacAddr pAssocStasArray = NULL;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0))
     char unknownSTAEvent[IW_CUSTOM_MAX+1];
     char maxAssocExceededEvent[IW_CUSTOM_MAX+1];
+#else
+    char maxAssocExceeded_unknownSTAEvent[IW_CUSTOM_MAX+1];  //combined to avoid not stack memory compiler error
+#endif
     v_BYTE_t we_custom_start_event[64];
     char *startBssEvent;
     hdd_context_t *pHddCtx;
@@ -1163,7 +1167,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                   staInfo.assoc_req_ies =
                      (const u8 *)&pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.ies[0];
                   staInfo.assoc_req_ies_len = iesLen;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,0,31))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,0,31)) && (LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0))
                   staInfo.filled |= STATION_INFO_ASSOC_REQ_IES;
 #endif
                   cfg80211_new_sta(dev,
@@ -1383,7 +1387,11 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                                 TRUE : FALSE );
            return VOS_STATUS_SUCCESS;
         case eSAP_UNKNOWN_STA_JOIN:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0))
             snprintf(unknownSTAEvent, IW_CUSTOM_MAX, "JOIN_UNKNOWN_STA-%02x:%02x:%02x:%02x:%02x:%02x",
+#else
+            snprintf(maxAssocExceeded_unknownSTAEvent, IW_CUSTOM_MAX, "JOIN_UNKNOWN_STA-%02x:%02x:%02x:%02x:%02x:%02x",
+#endif
                 pSapEvent->sapevt.sapUnknownSTAJoin.macaddr.bytes[0],
                 pSapEvent->sapevt.sapUnknownSTAJoin.macaddr.bytes[1],
                 pSapEvent->sapevt.sapUnknownSTAJoin.macaddr.bytes[2],
@@ -1391,14 +1399,25 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                 pSapEvent->sapevt.sapUnknownSTAJoin.macaddr.bytes[4],
                 pSapEvent->sapevt.sapUnknownSTAJoin.macaddr.bytes[5]);
             we_event = IWEVCUSTOM; /* Discovered a new node (AP mode). */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0))
             wrqu.data.pointer = unknownSTAEvent;
             wrqu.data.length = strlen(unknownSTAEvent);
             we_custom_event_generic = (v_BYTE_t *)unknownSTAEvent;
             hddLog(LOGE,"%s", unknownSTAEvent);
+#else
+            wrqu.data.pointer = maxAssocExceeded_unknownSTAEvent;
+            wrqu.data.length = strlen(maxAssocExceeded_unknownSTAEvent);
+            we_custom_event_generic = (v_BYTE_t *)maxAssocExceeded_unknownSTAEvent;//unknownSTAEvent;
+            hddLog(LOGE,"%s", maxAssocExceeded_unknownSTAEvent);
+#endif
             break;
 
         case eSAP_MAX_ASSOC_EXCEEDED:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0))
             snprintf(maxAssocExceededEvent, IW_CUSTOM_MAX, "Peer %02x:%02x:%02x:%02x:%02x:%02x denied"
+#else
+            snprintf(maxAssocExceeded_unknownSTAEvent, IW_CUSTOM_MAX, "Peer %02x:%02x:%02x:%02x:%02x:%02x denied"
+#endif
                     " assoc due to Maximum Mobile Hotspot connections reached. Please disconnect"
                     " one or more devices to enable the new device connection",
                     pSapEvent->sapevt.sapMaxAssocExceeded.macaddr.bytes[0],
@@ -1408,10 +1427,17 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                     pSapEvent->sapevt.sapMaxAssocExceeded.macaddr.bytes[4],
                     pSapEvent->sapevt.sapMaxAssocExceeded.macaddr.bytes[5]);
             we_event = IWEVCUSTOM; /* Discovered a new node (AP mode). */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0))
             wrqu.data.pointer = maxAssocExceededEvent;
             wrqu.data.length = strlen(maxAssocExceededEvent);
             we_custom_event_generic = (v_BYTE_t *)maxAssocExceededEvent;
             hddLog(LOG1,"%s", maxAssocExceededEvent);
+#else
+            wrqu.data.pointer = maxAssocExceeded_unknownSTAEvent;
+            wrqu.data.length = strlen(maxAssocExceeded_unknownSTAEvent);
+            we_custom_event_generic = (v_BYTE_t *)maxAssocExceeded_unknownSTAEvent;
+            hddLog(LOG1,"%s", maxAssocExceeded_unknownSTAEvent);
+#endif
             break;
         case eSAP_STA_ASSOC_IND:
             return VOS_STATUS_SUCCESS;
@@ -5319,11 +5345,13 @@ static const iw_handler hostapd_private[] = {
 };
 const struct iw_handler_def hostapd_handler_def = {
    .num_standard     = sizeof(hostapd_handler) / sizeof(hostapd_handler[0]),
+#ifdef CONFIG_WEXT_PRIV
    .num_private      = sizeof(hostapd_private) / sizeof(hostapd_private[0]),
    .num_private_args = sizeof(hostapd_private_args) / sizeof(hostapd_private_args[0]),
-   .standard         = (iw_handler *)hostapd_handler,
    .private          = (iw_handler *)hostapd_private,
    .private_args     = hostapd_private_args,
+#endif
+   .standard         = (iw_handler *)hostapd_handler,
    .get_wireless_stats = NULL,
 };
 
@@ -5353,7 +5381,9 @@ void hdd_set_ap_ops( struct net_device *pWlanHostapdDev )
 VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
 {
     hdd_hostapd_state_t * phostapdBuf;
+#ifdef CONFIG_WIRELESS_EXT
     struct net_device *dev = pAdapter->dev;
+#endif
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     VOS_STATUS status;
 #ifdef WLAN_FEATURE_MBSSID
@@ -5438,8 +5468,10 @@ VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
 
     sema_init(&(WLAN_HDD_GET_AP_CTX_PTR(pAdapter))->semWpsPBCOverlapInd, 1);
 
+#ifdef CONFIG_WIRELESS_EXT
      // Register as a wireless device
     dev->wireless_handlers = (struct iw_handler_def *)& hostapd_handler_def;
+#endif
 
     //Initialize the data path module
     status = hdd_softap_init_tx_rx(pAdapter);
@@ -5491,8 +5523,11 @@ hdd_adapter_t* hdd_wlan_create_ap_dev( hdd_context_t *pHddCtx, tSirMacAddr macAd
 
    hddLog(VOS_TRACE_LEVEL_DEBUG, "%s: iface_name = %s", __func__, iface_name);
 
-   pWlanHostapdDev = alloc_netdev_mq(sizeof(hdd_adapter_t), iface_name, ether_setup, NUM_TX_QUEUES);
-
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0))
+    pWlanHostapdDev = alloc_netdev_mq(sizeof(hdd_adapter_t), iface_name, ether_setup, NUM_TX_QUEUES);
+#else
+    pWlanHostapdDev = alloc_netdev_mq(sizeof(hdd_adapter_t), iface_name, NET_NAME_UNKNOWN, ether_setup, NUM_TX_QUEUES);
+#endif
     if (pWlanHostapdDev != NULL)
     {
         pHostapdAdapter = netdev_priv(pWlanHostapdDev);
@@ -5597,6 +5632,7 @@ VOS_STATUS hdd_unregister_hostapd(hdd_adapter_t *pAdapter)
 
    hdd_softap_deinit_tx_rx(pAdapter);
 
+#ifdef CONFIG_WIRELESS_EXT
    /* if we are being called during driver unload, then the dev has already
       been invalidated.  if we are being called at other times, then we can
       detach the wireless device handlers */
@@ -5604,6 +5640,7 @@ VOS_STATUS hdd_unregister_hostapd(hdd_adapter_t *pAdapter)
    {
       pAdapter->dev->wireless_handlers = NULL;
    }
+#endif
 
 #ifdef WLAN_FEATURE_MBSSID
    status = WLANSAP_Stop(sapContext);
