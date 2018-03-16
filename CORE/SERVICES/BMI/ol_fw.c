@@ -1782,6 +1782,10 @@ int ol_download_firmware(struct ol_softc *scn)
 		address = BMI_SEGMENTED_WRITE_ADDR;
 		printk("%s: Using 0x%x for the remainder of init\n", __func__, address);
 
+#ifdef CONFIG_NO_OTP
+	printk ("Not loading OTP data\n");
+#else
+
 		if ( scn->enablesinglebinary == FALSE ) {
 			status = ol_transfer_bin_file(scn, ATH_OTP_FILE,
 						      address, TRUE);
@@ -1793,6 +1797,7 @@ int ol_download_firmware(struct ol_softc *scn)
 				return status;
 			}
 		}
+#endif
 	}
 	if (scn->target_version == AR6320_REV1_1_VERSION){
 		/* To disable PCIe use 96 AXI memory as internal buffering,
