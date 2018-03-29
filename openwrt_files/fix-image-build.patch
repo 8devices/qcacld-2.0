@@ -1,0 +1,16 @@
+diff --git a/target/linux/brcm2708/image/Makefile b/target/linux/brcm2708/image/Makefile
+index 8cf83a4563..a11afd21fd 100644
+--- a/target/linux/brcm2708/image/Makefile
++++ b/target/linux/brcm2708/image/Makefile
+@@ -30,9 +30,9 @@ define Build/boot-img
+ 	mcopy -i $@.boot cmdline.txt ::
+ 	mcopy -i $@.boot config.txt ::
+ 	mcopy -i $@.boot $(word 1,$^) ::kernel.img
+-	$(foreach dts,$(shell echo $(DEVICE_DTS)),mcopy -i $@.boot $(DTS_DIR)/$(dts).dtb ::;)
++	$(foreach dts,$(shell echo $(DEVICE_DTS)),mcopy -i $@.boot $(DTS_DIR)/$(dts).dts ::;)
+ 	mmd -i $@.boot ::/overlays
+-	mcopy -i $@.boot $(DTS_DIR)/overlays/*.dtb ::/overlays/
++	mcopy -i $@.boot $(DTS_DIR)/overlays/*.dts ::/overlays/
+ 	mcopy -i $@.boot $(DTS_DIR)/overlays/README ::/overlays/
+ endef
+ 
