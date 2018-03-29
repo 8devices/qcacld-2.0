@@ -18,8 +18,8 @@ checkout_driver(){
 			echo pulling changes failed!!
 	else
 		DRIVER_ROOT_DIR="$PWD/qcacld-2.0" && git clone \
-		https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/qcacld-2.0 \
-		-b caf-wlan/LNX.LEH.4.2.2.2 && ret=0
+		https://github.com/8devices/qcacld-2.0 -b caf-wlan/LNX.LEH.4.2.2.2 \
+		&& ret=0
 		cd $DRIVER_ROOT_DIR
 	fi
 
