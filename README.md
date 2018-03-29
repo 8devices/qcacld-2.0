@@ -16,7 +16,7 @@ Note: This example tested on ubuntu 16.04 for other linux versions could need so
 
 2. Run script (checkouts qcaqcl-2.0 driver, openwrt and builds them)
 
-    wget -O - https://raw.githubusercontent.com/8devices/qcacld-2.0-8devices/master/scripts/start.sh | /bin/sh
+    wget -O - https://raw.githubusercontent.com/8devices/qcacld-2.0/caf-wlan/LNX.LEH.4.2.2.2/scripts/start.sh | /bin/sh
 
 3. Clone openwrt image to card. CHANGE ${PATH_TO_SD_CARD}
 
