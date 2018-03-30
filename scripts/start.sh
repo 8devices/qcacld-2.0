@@ -37,15 +37,15 @@ checkout_openwrt(){
 	else
 		cd $DRIVER_ROOT_DIR/../ &&\
 			git clone https://github.com/openwrt/openwrt.git &&\
-			cd openwrt && git checkout 993989880a && ret=0
+			cd openwrt && git checkout 993989880a && override_openwrt_files && ret=0
 	fi
 
 	cd $DIR
 	return $ret
 }
 
-#Overrides config files in openwrt repo
-copy_openwrt_files(){
+#Overrides openwrt cfg files and applies patches
+override_openwrt_files(){
 	OPENWRT_ROOT_DIR="$DRIVER_ROOT_DIR/../openwrt"
 	OPENWRT_FILES="$DRIVER_ROOT_DIR/openwrt_files"
 	DIR="$PWD"
@@ -68,11 +68,9 @@ build_openwrt(){
 
 	rm $DRIVER_ROOT_DIR/openwrt-out -rf
 	cd $OPENWRT_ROOT_DIR && make clean && make -j4 && mkdir $DRIVER_ROOT_DIR/openwrt-out &&\
-		cp bin/brcm2708/*img $DRIVER_ROOT_DIR/openwrt-out && ret=0
-
-	cp $OPENWRT_ROOT_DIR/build_dir/target-arm_cortex-a53+neon-vfpv4_musl-1.1.14_eabi/linux-brcm2708_bcm2710/linux-4.4.4/net/wireless/cfg80211.ko \
-		 $DRIVER_ROOT_DIR/openwrt-out ||
-		echo Failed find cfg80211.ko
+		ln -s $PWD/bin/brcm2708/*img $DRIVER_ROOT_DIR/openwrt-out && \
+		ln -s $PWD/build_dir/target-arm_cortex-a53+neon-vfpv4_musl-1.1.14_eabi/linux-brcm2708_bcm2710/linux-4.4.4/net/wireless/cfg80211.ko \
+		 $DRIVER_ROOT_DIR/openwrt-out/ && ret=0
 
 
 	cd $DIR
@@ -95,6 +93,5 @@ set -e
 
 checkout_driver
 checkout_openwrt
-copy_openwrt_files
 build_openwrt
 build_driver
