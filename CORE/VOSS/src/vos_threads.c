@@ -44,6 +44,7 @@
 #include <linux/sched.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
+#include <linux/version.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,0))
 #include <linux/sched/signal.h>
 #endif
