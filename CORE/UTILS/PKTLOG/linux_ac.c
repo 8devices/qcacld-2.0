@@ -756,10 +756,18 @@ static void pktlog_vclose(struct vm_area_struct *vma)
 	PKTLOG_MOD_DEC_USE_COUNT;
 }
 
+
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,25)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0))
+int pktlog_fault(struct vm_fault *vmf)
+{
+	struct vm_area_struct *vma = vmf->vma;
+	unsigned long address = vmf->address;
+#else
 int pktlog_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	unsigned long address = (unsigned long)vmf->virtual_address;
+#endif
 
 	if (address == 0UL)
 		return VM_FAULT_NOPAGE;
