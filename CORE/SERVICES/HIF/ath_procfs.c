@@ -30,6 +30,7 @@
 #include <linux/kernel.h>	/* We're doing kernel work */
 #include <linux/version.h>	/* We're doing kernel work */
 #include <linux/proc_fs.h>	/* Necessary because we use the proc fs */
+#include <linux/sched.h>
 #include <asm/uaccess.h>	/* for copy_from_user */
 #if defined(HIF_PCI)
 #include "if_pci.h"
