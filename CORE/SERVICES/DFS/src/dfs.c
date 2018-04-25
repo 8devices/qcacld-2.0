@@ -129,13 +129,23 @@ dfs_channel_mark_radar(struct ath_dfs *dfs, struct ieee80211_channel *chan)
 }
 #endif /* #if 0 */
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
+static void dfs_task(struct timer_list *t)
+#else
 static OS_TIMER_FUNC(dfs_task)
+#endif
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
+    struct ath_dfs *dfs = from_timer(dfs, t, ath_dfs_task_timer);
+    struct ieee80211com *ic = dfs->ic;
+#else
     struct ieee80211com *ic;
     struct ath_dfs *dfs = NULL;
 
     OS_GET_TIMER_ARG(ic, struct ieee80211com *);
     dfs = (struct ath_dfs *)ic->ic_dfs;
+#endif
+
     /*
      * XXX no locking?!
      */
@@ -180,8 +190,15 @@ static OS_TIMER_FUNC(dfs_task)
         }
     }
     dfs->ath_radar_tasksched = 0;
+    dfs->ath_radar_tasksched = 0;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
+static void dfs_testtimer_task(struct timer_list *t)
+{
+    struct ath_dfs *dfs = from_timer(dfs, t, ath_dfstesttimer);
+    struct ieee80211com *ic = dfs->ic;
+#else
 static
 OS_TIMER_FUNC(dfs_testtimer_task)
 {
@@ -190,6 +207,7 @@ OS_TIMER_FUNC(dfs_testtimer_task)
 
     OS_GET_TIMER_ARG(ic, struct ieee80211com *);
     dfs = (struct ath_dfs *)ic->ic_dfs;
+#endif
 
     /* XXX no locking? */
     dfs->ath_dfstest = 0;
@@ -266,10 +284,18 @@ dfs_attach(struct ieee80211com *ic)
     ic->ic_dfs_attach(ic, &dfs->dfs_caps, &radar_info);
     dfs_clear_stats(ic);
     dfs->dfs_event_log_on = 0;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
+    OS_INIT_TIMER(NULL, &(dfs->ath_dfs_task_timer), dfs_task);
+#else
     OS_INIT_TIMER(NULL, &(dfs->ath_dfs_task_timer), dfs_task, (void *) (ic));
+#endif
 #ifndef ATH_DFS_RADAR_DETECTION_ONLY
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
+    OS_INIT_TIMER(NULL, &(dfs->ath_dfstesttimer), dfs_testtimer_task);
+#else
     OS_INIT_TIMER(NULL, &(dfs->ath_dfstesttimer), dfs_testtimer_task,
         (void *) ic);
+#endif
     dfs->ath_dfs_cac_time = ATH_DFS_WAIT_MS;
     dfs->ath_dfstesttime = ATH_DFS_TEST_RETURN_PERIOD_MS;
 #endif

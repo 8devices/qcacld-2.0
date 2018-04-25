@@ -395,6 +395,9 @@ struct dfs_nolelem {
     unsigned long      nol_start_ticks;   /* NOL start time in OS ticks */
     u_int32_t          nol_timeout_ms;    /* NOL timeout value in msec */
     os_timer_t         nol_timer;         /* per element NOL timer */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
+    struct dfs_nol_timer_arg *nol_arg;    /* timer argument, needed by a newer API */
+#endif
     struct dfs_nolelem *nol_next;         /* next element pointer */
 } adf_os_packed;
 #ifdef WIN32
