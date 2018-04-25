@@ -1750,9 +1750,21 @@ void hdd_set_wlan_suspend_mode(bool suspend)
     vos_ssr_unprotect(__func__);
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0))
+static void hdd_ssr_timer_cb(struct timer_list *t)
+{
+    hddLog(VOS_TRACE_LEVEL_FATAL, "%s: HDD SSR timer expired!", __func__);
+    VOS_BUG(0);
+}
+#endif
+
 static void hdd_ssr_timer_init(void)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0))
+    timer_setup(&ssr_timer, hdd_ssr_timer_cb, 0);
+#else
     init_timer(&ssr_timer);
+#endif
 }
 
 static void hdd_ssr_timer_del(void)
@@ -1761,11 +1773,13 @@ static void hdd_ssr_timer_del(void)
     ssr_timer_started = false;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,10,0))
 static void hdd_ssr_timer_cb(unsigned long data)
 {
     hddLog(VOS_TRACE_LEVEL_FATAL, "%s: HDD SSR timer expired!", __func__);
     VOS_BUG(0);
 }
+#endif
 
 static void hdd_ssr_timer_start(int msec)
 {
@@ -1774,9 +1788,13 @@ static void hdd_ssr_timer_start(int msec)
         hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Trying to start SSR timer when "
                "it's running!", __func__);
     }
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0))
+    mod_timer(&ssr_timer, jiffies + msecs_to_jiffies(msec));
+#else
     ssr_timer.expires = jiffies + msecs_to_jiffies(msec);
     ssr_timer.function = hdd_ssr_timer_cb;
     add_timer(&ssr_timer);
+#endif
     ssr_timer_started = true;
 }
 
@@ -1903,7 +1921,9 @@ VOS_STATUS hdd_wlan_shutdown(void)
    /* Wait for TLshim RX to exit */
    hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Shutting down TLshim RX thread",
           __func__);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,10,0))
    unregister_hotcpu_notifier(vosSchedContext->cpuHotPlugNotifier);
+#endif
    set_bit(RX_SHUTDOWN_EVENT_MASK, &vosSchedContext->tlshimRxEvtFlg);
    set_bit(RX_POST_EVENT_MASK, &vosSchedContext->tlshimRxEvtFlg);
    wake_up_interruptible(&vosSchedContext->tlshimRxWaitQueue);
