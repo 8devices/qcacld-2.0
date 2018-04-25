@@ -57,11 +57,18 @@ typedef __adf_os_timer_t           adf_os_timer_t;
 static inline void
 adf_os_timer_init(adf_os_handle_t      hdl,
                   adf_os_timer_t      *timer,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
+                  adf_os_timer_func_t  func)
+{
+    __adf_os_timer_init(hdl, timer, func);
+}
+#else
                   adf_os_timer_func_t  func,
                   void                *arg)
 {
     __adf_os_timer_init(hdl, timer, func, arg);
 }
+#endif
 
 /**
  * @brief Start a one-shot timer

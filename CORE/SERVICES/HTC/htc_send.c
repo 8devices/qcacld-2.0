@@ -161,9 +161,15 @@ static void SendPacketCompletion(HTC_TARGET *target, HTC_PACKET *pPacket)
 }
 
 void
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
+HTCSendCompleteCheckCleanup(struct timer_list *t)
+{
+    HTC_ENDPOINT *pEndpoint = from_timer(pEndpoint, t, ul_poll_timer);
+#else
 HTCSendCompleteCheckCleanup(void *context)
 {
     HTC_ENDPOINT *pEndpoint = (HTC_ENDPOINT *) context;
+#endif
     HTCSendCompleteCheck(pEndpoint, 1);
 }
 

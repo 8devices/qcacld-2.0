@@ -207,9 +207,15 @@ htt_rx_ring_fill_level(struct htt_pdev_t *pdev)
 }
 
 static void
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
+htt_rx_ring_refill_retry(struct timer_list *t)
+{
+    htt_pdev_handle pdev = from_timer(pdev, t, rx_ring.refill_retry_timer);
+#else
 htt_rx_ring_refill_retry(void *arg)
 {
     htt_pdev_handle pdev = (htt_pdev_handle)arg;
+#endif
     htt_rx_msdu_buff_replenish(pdev);
 }
 
@@ -2395,7 +2401,11 @@ htt_rx_attach(struct htt_pdev_t *pdev)
 
         /* Initialize the Rx refill retry timer */
         adf_os_timer_init(pdev->osdev, &pdev->rx_ring.refill_retry_timer,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
+                          htt_rx_ring_refill_retry);
+#else
                           htt_rx_ring_refill_retry, (void *)pdev);
+#endif
 
         pdev->rx_ring.fill_cnt = 0;
 #ifdef DEBUG_DMA_DONE
