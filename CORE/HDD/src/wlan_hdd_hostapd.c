@@ -401,7 +401,11 @@ static int hdd_hostapd_ioctl(struct net_device *dev,
 
    switch (cmd) {
    case (SIOCDEVPRIVATE + 1):
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0))
+      if (in_compat_syscall())
+#else
       if (is_compat_task())
+#endif
          ret = hdd_hostapd_driver_compat_ioctl(pAdapter, ifr);
       else
          ret = hdd_hostapd_driver_ioctl(pAdapter, ifr);
@@ -5565,7 +5569,11 @@ hdd_adapter_t* hdd_wlan_create_ap_dev( hdd_context_t *pHddCtx, tSirMacAddr macAd
         vos_mem_copy(pHostapdAdapter->macAddressCurrent.bytes, (void *)macAddr, sizeof(tSirMacAddr));
 
         pHostapdAdapter->offloads_configured = FALSE;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,0))
+        pWlanHostapdDev->priv_destructor = free_netdev;
+#else
         pWlanHostapdDev->destructor = free_netdev;
+#endif
         pWlanHostapdDev->ieee80211_ptr = &pHostapdAdapter->wdev ;
         pHostapdAdapter->wdev.wiphy = pHddCtx->wiphy;
         pHostapdAdapter->wdev.netdev =  pWlanHostapdDev;

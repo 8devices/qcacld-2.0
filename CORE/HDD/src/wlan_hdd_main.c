@@ -6025,7 +6025,11 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
    switch (cmd) {
    case (SIOCDEVPRIVATE + 1):
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0))
+      if (in_compat_syscall())
+#else
       if (is_compat_task())
+#endif
          ret = hdd_driver_compat_ioctl(pAdapter, ifr);
       else
          ret = hdd_driver_ioctl(pAdapter, ifr);
@@ -8053,7 +8057,11 @@ static hdd_adapter_t* hdd_alloc_station_adapter( hdd_context_t *pHddCtx, tSirMac
 #endif
       hdd_set_station_ops( pAdapter->dev );
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,0))
+      pWlanDev->priv_destructor = free_netdev;
+#else
       pWlanDev->destructor = free_netdev;
+#endif
       pWlanDev->ieee80211_ptr = &pAdapter->wdev ;
       pAdapter->wdev.wiphy = pHddCtx->wiphy;
       pAdapter->wdev.netdev =  pWlanDev;
@@ -13018,7 +13026,12 @@ static void __exit hdd_module_exit(void)
 
 #ifdef MODULE
 static int fwpath_changed_handler(const char *kmessage,
-                                 struct kernel_param *kp)
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0))
+                                  const struct kernel_param *kp)
+#else
+                                  struct kernel_param *kp)
+#endif
 {
    return param_set_copystring(kmessage, kp);
 }
