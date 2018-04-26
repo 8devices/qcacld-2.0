@@ -18,6 +18,10 @@ ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
 	CONFIG_ROME_IF = sdio
 endif
 
+ifeq ($(CONFIG_CLD_HL_USB_CORE), y)
+	CONFIG_ROME_IF = usb
+endif
+
 ifndef CONFIG_ROME_IF
 	#use pci as default interface
 	CONFIG_ROME_IF = pci
