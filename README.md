@@ -89,7 +89,7 @@ Or
     wpa_passphrase $SSID $PASSWORD >> /tmp/wpa_supplicant.conf
     adb shell svc wifi enable
 
-Crosscompiling openwrt with qcaqcl driver guide:
+Crosscompiling openwrt with qcacld driver guide:
 -------------------------------------
 
 Note: This example tested on ubuntu 16.04 for other linux versions could need some tuning.
@@ -99,7 +99,7 @@ Note: This example tested on ubuntu 16.04 for other linux versions could need so
     sudo apt-get install git build-essential libssl-dev libncurses5-dev unzip \
     gawk zlib1g-dev subversion mercurial wget
 
-2.Run script (checkouts qcaqcl-2.0 driver, openwrt and builds them)
+2.Run script (checkouts qcacld-2.0 driver, openwrt and builds them)
 
     wget -O - https://raw.githubusercontent.com/8devices/qcacld-2.0/caf-wlan/LNX.LEH.4.2.2.2/scripts/start.sh | /bin/sh
 
