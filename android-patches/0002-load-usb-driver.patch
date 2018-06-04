@@ -1,0 +1,14 @@
+diff --git a/init.rpi3.rc b/init.rpi3.rc
+index c37494f..ee117c2 100644
+--- a/init.rpi3.rc
++++ b/init.rpi3.rc
+@@ -39,6 +39,9 @@ on boot
+     setprop service.adb.tcp.port 5555
+     start adbd
+ 
++    #load wlan-usb
++    insmod /lib/modules/wlan-usb.ko
++
+ service wpa_supplicant /system/bin/wpa_supplicant \
+     -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf \
+     -I/system/etc/wifi/wpa_supplicant_overlay.conf \
