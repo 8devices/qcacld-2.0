@@ -22,7 +22,7 @@ Compile Android with qcacld driver
 
     cd kernel/rpi
     ARCH=arm scripts/kconfig/merge_config.sh arch/arm/configs/bcm2709_defconfig android/configs/android-base.cfg android/configs/android-recommended.cfg
-    ARCH=arm CROSS_COMPILE=$ANDROID_TOOLCHAIN make zImage dtbs -j4
+    PATH=$ANDROID_BUILD_PATHS$PATH ARCH=arm CROSS_COMPILE=arm-linux-androideabi- make zImage dtbs -j4
 
 4.Checkout qcacld-2.0 drivers
 
