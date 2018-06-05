@@ -88,6 +88,8 @@ or
 
     adb pull /data/misc/wifi/wpa_supplicant.conf /tmp/
     wpa_passphrase $SSID $PASSWORD >> /tmp/wpa_supplicant.conf
+    adb push /tmp/wpa_supplicant.conf /data/misc/wifi/wpa_supplicant.conf
+    adb shell chown wifi:wifi /data/misc/wifi/wpa_supplicant.conf
     adb shell svc wifi enable
 
 Compile OpenWRT with qcacld driver
