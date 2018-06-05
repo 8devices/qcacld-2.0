@@ -1,3 +1,12 @@
+diff --git a/boot/config.txt b/boot/config.txt
+index 41b922f..4612553 100644
+--- a/boot/config.txt
++++ b/boot/config.txt
+@@ -14,3 +14,4 @@ initramfs ramdisk.img 0x01f00000
+ mask_gpu_interrupt0=0x400
+ avoid_warnings=2
+ enable_uart=1
++dtoverlay=sdio,poll_once=off
 diff --git a/init.rpi3.rc b/init.rpi3.rc
 index c37494f..ee117c2 100644
 --- a/init.rpi3.rc

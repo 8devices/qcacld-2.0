@@ -46,18 +46,19 @@ Both:
 
 6.Include driver into Android build system
 
-    patch -p1 $ANDROID_BUILD_TOP/device/brcm/rpi3/rpi3.mk android-patches/0001-add-qcacld-blobs.path
     mkdir $ANDROID_BUILD_TOP/device/brcm/rpi3/firmware/qcacld-2.0
     ln -s $PWD/firmware/{usb,sdio} $ANDROID_BUILD_TOP/device/brcm/rpi3/firmware/qcacld-2.0
     ln -s $PWD/wlan-{usb,sdio}.ko $ANDROID_BUILD_TOP/device/brcm/rpi3/firmware/qcacld-2.0
 
 7.Patch for auto-loading
 
-    patch -p1 $ANDROID_BUILD_TOP/device/brcm/rpi3/init.rpi3.rc android-patches/0002-load-usb-driver.patch
+    patch -p1 -d $ANDROID_BUILD_TOP/device/brcm/rpi3/ < android-patches/0001-load-usb-driver.patch
+    patch -p1 -d $ANDROID_BUILD_TOP/device/brcm/rpi3/ < android-patches/0002-add-usb-blobs.patch
 
 or
 
-    patch -p1 $ANDROID_BUILD_TOP/device/brcm/rpi3/init.rpi3.rc android-patches/0003-load-sdio-driver.patch
+    patch -p1 -d $ANDROID_BUILD_TOP/device/brcm/rpi3/ < android-patches/0003-load-sdio-driver.patch
+    patch -p1 -d $ANDROID_BUILD_TOP/device/brcm/rpi3/ < android-patches/0004-add-sdio-blobs.patch
 
 8.Build Android source
 

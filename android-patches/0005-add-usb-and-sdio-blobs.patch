@@ -1,0 +1,35 @@
+diff --git a/rpi3.mk b/rpi3.mk
+index 047e8b6..1b3d737 100644
+--- a/rpi3.mk
++++ b/rpi3.mk
+@@ -46,6 +46,30 @@ PRODUCT_COPY_FILES := \
+     $(LOCAL_PATH)/bluetooth/bt_vendor.conf:system/etc/bluetooth/bt_vendor.conf \
+     $(PRODUCT_COPY_FILES)
+
++# qcacld driver usb blobs:
++PRODUCT_COPY_FILES := \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/usb/utf.bin:root/lib/firmware/utf.bin \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/usb/athwlan.bin:root/lib/firmware/athwlan.bin \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/usb/otp.bin:root/lib/firmware/otp.bin \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/usb/fakeboar.bin:root/lib/firmware/fakeboar.bin \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/usb/wlan/usb_qcom_cfg.ini:root/lib/firmware/wlan/usb_qcom_cfg.ini \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/usb/wlan/usb_cfg.dat:root/lib/firmware/wlan/usb_cfg.dat \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/usb/qca61x4.bin:root/lib/firmware/qca61x4.bin \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/wlan-usb.ko:root/lib/modules/wlan-usb.ko \
++    $(PRODUCT_COPY_FILES)
++
++# qcacld driver sdio blobs:
++PRODUCT_COPY_FILES := \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/sdio/utfbd30.bin:root/lib/firmware/utfbd30.bin \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/sdio/otp30.bin:root/lib/firmware/otp30.bin \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/sdio/bdwlan30.bin:root/lib/firmware/bdwlan30.bin \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/sdio/utf30.bin:root/lib/firmware/utf30.bin \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/sdio/wlan/sdio_qcom_cfg.ini:root/lib/firmware/wlan/sdio_qcom_cfg.ini \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/sdio/wlan/sdio_cfg.dat:root/lib/firmware/wlan/sdio_cfg.dat \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/sdio/qwlan30.bin:root/lib/firmware/qwlan30.bin \
++    $(LOCAL_PATH)/firmware/qcacld-2.0/wlan-sdio.ko:root/lib/modules/wlan-sdio.ko \
++    $(PRODUCT_COPY_FILES)
++
+ # media configurations
+ PRODUCT_COPY_FILES := \
+     device/generic/goldfish/camera/media_profiles.xml:system/etc/media_profiles.xml \
