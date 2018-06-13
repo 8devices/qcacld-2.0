@@ -51,10 +51,8 @@ override_openwrt_files(){
 	DIR="$PWD"
 	ret=1
 
-	cp $OPENWRT_FILES/image-config $OPENWRT_ROOT_DIR/target/linux/brcm2708/image/config.txt &&\
-	cp $OPENWRT_FILES/kernel-config-4.4 $OPENWRT_ROOT_DIR/target/linux/brcm2708/bcm2710/config-4.4 &&\
-	cp $OPENWRT_FILES/menu-config $OPENWRT_ROOT_DIR/.config &&\
-	cd $OPENWRT_ROOT_DIR && patch -p1 < $OPENWRT_FILES/fix-image-build.patch
+	cp $OPENWRT_FILES/config $OPENWRT_ROOT_DIR/.config &&\
+	cd $OPENWRT_ROOT_DIR && patch -p1 < $OPENWRT_FILES/openwrt.patch
 	ret=0
 
 	cd $DIR
