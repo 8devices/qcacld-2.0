@@ -10,4 +10,4 @@ set -e
 
 mkdir -p $ROOTFS/lib/firmware/wlan
 cp wlan-usb.ko openwrt-out/cfg80211.ko $ROOTFS/lib/modules/4.4.4/
-cp -r wlan_firmware-usb/* $ROOTFS/lib/firmware/
+cp -r firmware/usb/* $ROOTFS/lib/firmware/

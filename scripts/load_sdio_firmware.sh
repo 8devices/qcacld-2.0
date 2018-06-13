@@ -10,4 +10,4 @@ set -e
 
 mkdir -p $ROOTFS/lib/firmware/wlan
 cp wlan-sdio.ko openwrt-out/cfg80211.ko $ROOTFS/lib/modules/4.4.4/
-cp -r wlan_firmware-sdio/* $ROOTFS/lib/firmware/
+cp -r firmware/sdio/* $ROOTFS/lib/firmware/
