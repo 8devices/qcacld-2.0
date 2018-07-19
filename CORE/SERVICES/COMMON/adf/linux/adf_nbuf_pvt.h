@@ -86,6 +86,7 @@ struct cvg_nbuf_cb {
      * provided by the OS.
      */
     u_int32_t mapped_paddr_lo[CVG_NBUF_MAX_OS_FRAGS];
+    uint32_t owner_id;
 
     /* store extra tx fragments provided by the driver */
     struct {
@@ -108,7 +109,6 @@ struct cvg_nbuf_cb {
              */
             wordstream_flags : CVG_NBUF_MAX_EXTRA_FRAGS+1;
     } extra_frags;
-    uint32_t owner_id;
     __adf_nbuf_callback_fn adf_nbuf_callback_fn;
 #ifdef IPA_OFFLOAD
     unsigned long priv_data;
