@@ -1118,7 +1118,7 @@ adf_nbuf_trace_update(adf_nbuf_t buf, char *event_string)
 static inline void
 adf_nbuf_set_tx_parallel_dnload_frm(adf_nbuf_t buf, uint8_t candi)
 {
-   __adf_nbuf_set_tx_htt2_frm(buf, candi);
+   //__adf_nbuf_set_tx_htt2_frm(buf, candi);
 }
 
 /**
