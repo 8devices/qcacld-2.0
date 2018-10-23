@@ -1865,7 +1865,11 @@ v_VOID_t hdd_wmm_classify_pkt ( hdd_adapter_t* pAdapter,
 
   @return         : Qdisc queue index
   ===========================================================================*/
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+v_U16_t hdd_hostapd_select_queue(struct net_device *dev, struct sk_buff *skb,
+                                 struct net_device *sb_dev, select_queue_fallback_t fallback)
+
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
 v_U16_t hdd_hostapd_select_queue(struct net_device * dev, struct sk_buff *skb,
                                  void *accel_priv, select_queue_fallback_t fallback)
 
