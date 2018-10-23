@@ -77,9 +77,15 @@ build_openwrt(){
 
 build_driver(){
 	DIR="$PWD"
+	BUILD_PARA+="OPENWRT_DIR=${DIR}/../openwrt "
+	BUILD_PARA+="KERNEL_SRC=${OPENWRT_DIR}/build_dir/target-arm_cortex-a53+neon-vfpv4_musl-1.1.14_eabi/linux-brcm2708_bcm2710/linux-4.4.4 "
+	BUILD_PARA+="ARCH=arm "
+	BUILD_PARA+="STAGING_DIR=${OPENWRT_DIR}/staging_dir "
+	BUILD_PARA+="CROSS_COMPILE=${OPENWRT_DIR}/staging_dir/toolchain-arm_cortex-a53+neon-vfpv4_gcc-5.3.0_musl-1.1.14_eabi/bin/arm-openwrt-linux- "
+
 	ret=1
 
-	cd $DRIVER_ROOT_DIR && make clean && make -j4 && ret=0
+	cd $DRIVER_ROOT_DIR && $BUILD_PARA make clean && $BUILD_PARA make -j4 && ret=0
 
 	cd $DIR
 	return $ret

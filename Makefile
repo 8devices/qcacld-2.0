@@ -4,12 +4,7 @@
 # KERNEL_SRC =
 # CROSS_COMPILE =
 
-OPENWRT_DIR ?= "${PWD}/../openwrt"
-KERNEL_SRC ?= ${OPENWRT_DIR}/build_dir/target-arm_cortex-a53+neon-vfpv4_musl-1.1.14_eabi/linux-brcm2708_bcm2710/linux-4.4.4
-
-export ARCH ?= arm
-export STAGING_DIR = ${OPENWRT_DIR}/staging_dir
-export CROSS_COMPILE ?= ${OPENWRT_DIR}/staging_dir/toolchain-arm_cortex-a53+neon-vfpv4_gcc-5.3.0_musl-1.1.14_eabi/bin/arm-openwrt-linux-
+KERNEL_SRC ?= /lib/modules/$(shell uname -r)/build
 
 KBUILD_OPTIONS := WLAN_ROOT=$(PWD)
 
@@ -31,6 +26,7 @@ KBUILD_OPTIONS += CONFIG_CFG80211=m
 KBUILD_OPTIONS += CONFIG_LINUX_QCMBR=y
 KBUILD_OPTIONS += SAP_AUTH_OFFLOAD=1
 KBUILD_OPTIONS += CONFIG_PER_VDEV_TX_DESC_POOL=1
+KBUILD_OPTIONS += CFLAGS_MODULE=-Wno-misleading-indentation
 KBUILD_OPTIONS += $(KBUILD_EXTRA) # Extra config if any
 
 .NOTPARALLEL:
