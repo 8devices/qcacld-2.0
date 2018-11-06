@@ -1,0 +1,10 @@
+.gitignore
+tags
+*.o
+*.ko
+*.o.cmd
+.tmp_versions/
+.wlan.ko.cmd
+Module.symvers
+modules.order
+wlan.mod.c

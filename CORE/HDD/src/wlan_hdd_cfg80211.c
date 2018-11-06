@@ -832,7 +832,8 @@ struct cfg_hostapd_edca {
 	uint8_t enable;
 };
 
-#ifdef WLAN_NL80211_TESTMODE
+//#ifdef WLAN_NL80211_TESTMODE
+#if 1
 enum wlan_hdd_tm_attr
 {
     WLAN_HDD_TM_ATTR_INVALID = 0,
