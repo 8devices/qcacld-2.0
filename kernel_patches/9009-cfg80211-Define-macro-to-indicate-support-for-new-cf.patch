@@ -1,0 +1,27 @@
+From 9fe747147cc6f0c546bac6b246729e0d1e0991f9 Mon Sep 17 00:00:00 2001
+From: Nakul Kachhwaha <nkachh@codeaurora.org>
+Date: Mon, 7 Aug 2017 13:25:49 +0530
+Subject: [PATCH] cfg80211: Define macro to indicate support for new cfg80211
+ connect api
+
+Define macro to indicate backport support for the new
+cfg80211 connect api 'cfg80211_connect_bss'.
+---
+ include/net/cfg80211.h |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/net/cfg80211.h b/include/net/cfg80211.h
+index 415d389..134f6a4 100644
+--- a/include/net/cfg80211.h
++++ b/include/net/cfg80211.h
+@@ -65,6 +65,7 @@
+ #define CFG80211_CONNECT_DONE 1
+ /* Indicate backport support for FILS SK offload in cfg80211 */
+ #define CFG80211_FILS_SK_OFFLOAD_SUPPORT 1
++#define CFG80211_CONNECT_BSS 1
+ 
+ struct wiphy;
+ 
+-- 
+1.7.9.5
+

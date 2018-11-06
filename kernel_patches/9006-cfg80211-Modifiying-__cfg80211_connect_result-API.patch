@@ -1,0 +1,131 @@
+From 7e84ea9bed414d4d06fdb3ba18039b1018409350 Mon Sep 17 00:00:00 2001
+From: nakul kachhwaha <nkachh@codeaurora.org>
+Date: Fri, 12 May 2017 16:45:19 +0530
+Subject: [PATCH] cfg80211: Modifiying __cfg80211_connect_result API for FILS
+
+Modified the __cfg80211_connect_result API to accomodate FILS
+related parameters to be passed to the supplicant through nl
+event. The extra parameters are kek, kek length, pmk, pmk length,
+pmkid generated through FILS AKM which is offloaded to driver.
+Supplicant will use these parameters to update its EAPOL sm and
+to retriveing GTK from EAPOL frame on the periodic GTK-rekeying
+from authenticator.
+
+Intoducing the check to validate cv.bssid pointer before passing it
+to 'is_zero_ether_addr' function while handling EVENT_CONNECT_RESULT
+case in function cfg80211_process_wdev_events.
+---
+ net/wireless/core.h |  3 ++-
+ net/wireless/mlme.c |  2 +-
+ net/wireless/sme.c  | 20 ++++++++++++++++----
+ net/wireless/util.c |  4 ++--
+ 4 files changed, 21 insertions(+), 8 deletions(-)
+
+diff --git a/net/wireless/core.h b/net/wireless/core.h
+index cf846a7..71dac87 100644
+--- a/net/wireless/core.h
++++ b/net/wireless/core.h
+@@ -380,7 +380,8 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+ 			       const u8 *req_ie, size_t req_ie_len,
+ 			       const u8 *resp_ie, size_t resp_ie_len,
+ 			       int status, bool wextev,
+-			       struct cfg80211_bss *bss);
++			       struct cfg80211_bss *bss,
++                   struct cfg80211_connect_resp_params *cr);
+ void __cfg80211_disconnected(struct net_device *dev, const u8 *ie,
+ 			     size_t ie_len, u16 reason, bool from_ap);
+ int cfg80211_disconnect(struct cfg80211_registered_device *rdev,
+diff --git a/net/wireless/mlme.c b/net/wireless/mlme.c
+index 4646cf5..f8be8ac 100644
+--- a/net/wireless/mlme.c
++++ b/net/wireless/mlme.c
+@@ -48,7 +48,7 @@ void cfg80211_rx_assoc_resp(struct net_device *dev, struct cfg80211_bss *bss,
+ 	/* update current_bss etc., consumes the bss reference */
+ 	__cfg80211_connect_result(dev, mgmt->bssid, NULL, 0, ie, len - ieoffs,
+ 				  status_code,
+-				  status_code == WLAN_STATUS_SUCCESS, bss);
++				  status_code == WLAN_STATUS_SUCCESS, bss, NULL);
+ }
+ EXPORT_SYMBOL(cfg80211_rx_assoc_resp);
+ 
+diff --git a/net/wireless/sme.c b/net/wireless/sme.c
+index 2e65ec6..c337676 100644
+--- a/net/wireless/sme.c
++++ b/net/wireless/sme.c
+@@ -247,7 +247,7 @@ void cfg80211_conn_work(struct work_struct *work)
+ 		if (cfg80211_conn_do_work(wdev)) {
+ 			__cfg80211_connect_result(
+ 					wdev->netdev, bssid,
+-					NULL, 0, NULL, 0, -1, false, NULL);
++					NULL, 0, NULL, 0, -1, false, NULL, NULL);
+ 		}
+ 		wdev_unlock(wdev);
+ 	}
+@@ -352,7 +352,7 @@ void cfg80211_sme_rx_auth(struct wireless_dev *wdev, const u8 *buf, size_t len)
+ 	} else if (status_code != WLAN_STATUS_SUCCESS) {
+ 		__cfg80211_connect_result(wdev->netdev, mgmt->bssid,
+ 					  NULL, 0, NULL, 0,
+-					  status_code, false, NULL);
++					  status_code, false, NULL, NULL);
+ 	} else if (wdev->conn->state == CFG80211_CONN_AUTHENTICATING) {
+ 		wdev->conn->state = CFG80211_CONN_ASSOCIATE_NEXT;
+ 		schedule_work(&rdev->conn_work);
+@@ -661,7 +661,8 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+ 			       const u8 *req_ie, size_t req_ie_len,
+ 			       const u8 *resp_ie, size_t resp_ie_len,
+ 			       int status, bool wextev,
+-			       struct cfg80211_bss *bss)
++			       struct cfg80211_bss *bss,
++                   struct cfg80211_connect_resp_params *cr)
+ {
+ 	struct wireless_dev *wdev = dev->ieee80211_ptr;
+ 	const u8 *country_ie;
+@@ -677,11 +678,22 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+ 		return;
+ 	}
+ 
+-	nl80211_send_connect_result(wiphy_to_rdev(wdev->wiphy), dev,
++    if (cr && cr->fils_kek_len) {
++	    nl80211_send_connect_result(wiphy_to_rdev(wdev->wiphy), dev,
++				    bssid, req_ie, req_ie_len,
++				    resp_ie, resp_ie_len,
++				    cr->fils_kek, cr->fils_kek_len,
++                    cr->update_erp_next_seq_num,
++                    cr->fils_erp_next_seq_num,
++                    cr->pmk, cr->pmk_len, cr->pmkid,
++				    status, GFP_KERNEL);
++    }else {
++	    nl80211_send_connect_result(wiphy_to_rdev(wdev->wiphy), dev,
+ 				    bssid, req_ie, req_ie_len,
+ 				    resp_ie, resp_ie_len,
+ 				    NULL, 0, 0, 0, NULL, 0, NULL,
+ 				    status, GFP_KERNEL);
++    }
+ 
+ #ifdef CONFIG_CFG80211_WEXT
+ 	if (wextev) {
+diff --git a/net/wireless/util.c b/net/wireless/util.c
+index 35ffbf5..ba997c0 100644
+--- a/net/wireless/util.c
++++ b/net/wireless/util.c
+@@ -943,7 +943,7 @@ void cfg80211_process_wdev_events(struct wireless_dev *wdev)
+ 		wdev_lock(wdev);
+ 		switch (ev->type) {
+ 		case EVENT_CONNECT_RESULT:
+-			if (!is_zero_ether_addr(ev->cr.bssid))
++			if (ev->cr.bssid && !is_zero_ether_addr(ev->cr.bssid))
+ 				bssid = ev->cr.bssid;
+ 			__cfg80211_connect_result(
+ 				wdev->netdev, bssid,
+@@ -951,7 +951,7 @@ void cfg80211_process_wdev_events(struct wireless_dev *wdev)
+ 				ev->cr.resp_ie, ev->cr.resp_ie_len,
+ 				ev->cr.status,
+ 				ev->cr.status == WLAN_STATUS_SUCCESS,
+-				ev->cr.bss);
++				ev->cr.bss, &ev->cr);
+ 			break;
+ 		case EVENT_ROAMED:
+ 			__cfg80211_roamed(wdev, ev->rm.bss, ev->rm.req_ie,
+-- 
+2.9.3
+

@@ -1,0 +1,388 @@
+From feef6d1cb971ce2ace3d55ba190703862ad89402 Mon Sep 17 00:00:00 2001
+From: nakul kachhwaha <nkachh@codeaurora.org>
+Date: Tue, 23 May 2017 18:49:07 +0530
+Subject: [PATCH] cfg80211: Use a structure to pass connect response params
+
+Currently the connect event from driver takes all the connection
+response parameters as arguments. With support for new features these
+response parameters can grow. Use a structure to pass these parameters
+rather than passing them as function arguments. This patch is must for
+FILS with shared key feature as FILS related params which are passed
+to supplicant are embedded into this structure.
+
+---
+ net/wireless/core.h    |  9 ++---
+ net/wireless/mlme.c    | 19 +++++++----
+ net/wireless/nl80211.c | 49 +++++++++++++--------------
+ net/wireless/nl80211.h | 11 ++----
+ net/wireless/sme.c     | 90 ++++++++++++++++++++++----------------------------
+ net/wireless/util.c    | 12 ++-----
+ 6 files changed, 83 insertions(+), 107 deletions(-)
+
+diff --git a/net/wireless/core.h b/net/wireless/core.h
+index 71dac87..bf97bda 100644
+--- a/net/wireless/core.h
++++ b/net/wireless/core.h
+@@ -376,12 +376,9 @@ int cfg80211_connect(struct cfg80211_registered_device *rdev,
+ 		     struct cfg80211_connect_params *connect,
+ 		     struct cfg80211_cached_keys *connkeys,
+ 		     const u8 *prev_bssid);
+-void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+-			       const u8 *req_ie, size_t req_ie_len,
+-			       const u8 *resp_ie, size_t resp_ie_len,
+-			       int status, bool wextev,
+-			       struct cfg80211_bss *bss,
+-                   struct cfg80211_connect_resp_params *cr);
++void __cfg80211_connect_result(struct net_device *dev,
++                   struct cfg80211_connect_resp_params *cr,
++			       bool wextev);
+ void __cfg80211_disconnected(struct net_device *dev, const u8 *ie,
+ 			     size_t ie_len, u16 reason, bool from_ap);
+ int cfg80211_disconnect(struct cfg80211_registered_device *rdev,
+diff --git a/net/wireless/mlme.c b/net/wireless/mlme.c
+index f8be8ac..47ddf68 100644
+--- a/net/wireless/mlme.c
++++ b/net/wireless/mlme.c
+@@ -26,9 +26,16 @@ void cfg80211_rx_assoc_resp(struct net_device *dev, struct cfg80211_bss *bss,
+ 	struct wiphy *wiphy = wdev->wiphy;
+ 	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wiphy);
+ 	struct ieee80211_mgmt *mgmt = (struct ieee80211_mgmt *)buf;
+-	u8 *ie = mgmt->u.assoc_resp.variable;
+-	int ieoffs = offsetof(struct ieee80211_mgmt, u.assoc_resp.variable);
+-	u16 status_code = le16_to_cpu(mgmt->u.assoc_resp.status_code);
++    struct cfg80211_connect_resp_params cr;
++
++    memset(&cr, 0, sizeof(cr));
++    cr.status = (int)le16_to_cpu(mgmt->u.assoc_resp.status_code);
++    cr.bssid = mgmt->bssid;
++    cr.bss = bss;
++    cr.resp_ie = mgmt->u.assoc_resp.variable;
++    cr.resp_ie_len =
++        len - offsetof(struct ieee80211_mgmt, u.assoc_resp.variable);
++    cr.timeout_reason = NL80211_TIMEOUT_UNSPECIFIED;
+ 
+ 	trace_cfg80211_send_rx_assoc(dev, bss);
+ 
+@@ -38,7 +45,7 @@ void cfg80211_rx_assoc_resp(struct net_device *dev, struct cfg80211_bss *bss,
+ 	 * and got a reject -- we only try again with an assoc
+ 	 * frame instead of reassoc.
+ 	 */
+-	if (cfg80211_sme_rx_assoc_resp(wdev, status_code)) {
++	if (cfg80211_sme_rx_assoc_resp(wdev, cr.status)) {
+ 		cfg80211_unhold_bss(bss_from_pub(bss));
+ 		cfg80211_put_bss(wiphy, bss);
+ 		return;
+@@ -46,9 +53,7 @@ void cfg80211_rx_assoc_resp(struct net_device *dev, struct cfg80211_bss *bss,
+ 
+ 	nl80211_send_rx_assoc(rdev, dev, buf, len, GFP_KERNEL, uapsd_queues);
+ 	/* update current_bss etc., consumes the bss reference */
+-	__cfg80211_connect_result(dev, mgmt->bssid, NULL, 0, ie, len - ieoffs,
+-				  status_code,
+-				  status_code == WLAN_STATUS_SUCCESS, bss, NULL);
++	__cfg80211_connect_result(dev, &cr, cr.status == WLAN_STATUS_SUCCESS);
+ }
+ EXPORT_SYMBOL(cfg80211_rx_assoc_resp);
+ 
+diff --git a/net/wireless/nl80211.c b/net/wireless/nl80211.c
+index 84aec2e..be3e49f 100644
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -13179,19 +13179,16 @@ void nl80211_send_assoc_timeout(struct cfg80211_registered_device *rdev,
+ }
+ 
+ void nl80211_send_connect_result(struct cfg80211_registered_device *rdev,
+-				 struct net_device *netdev, const u8 *bssid,
+-				 const u8 *req_ie, size_t req_ie_len,
+-				 const u8 *resp_ie, size_t resp_ie_len,
+-				 const u8 *fils_kek, size_t fils_kek_len,
+-				 bool update_erp_next_seq_num,
+-				 u16 fils_erp_next_seq_num, const u8 *pmk,
+-				 size_t pmk_len, const u8 *pmkid,
+-				 int status, gfp_t gfp)
++				 struct net_device *netdev,
++                 struct cfg80211_connect_resp_params *cr,
++                 gfp_t gfp)
+ {
+ 	struct sk_buff *msg;
+ 	void *hdr;
+ 
+-	msg = nlmsg_new(100 + req_ie_len + resp_ie_len, gfp);
++	msg = nlmsg_new(100 + cr->req_ie_len + cr->resp_ie_len +
++                    cr->fils_kek_len + cr->pmk_len +
++                    (cr->pmkid ? WLAN_PMKID_LEN : 0), gfp);
+ 	if (!msg)
+ 		return;
+ 
+@@ -13203,25 +13200,25 @@ void nl80211_send_connect_result(struct cfg80211_registered_device *rdev,
+ 
+ 	if (nla_put_u32(msg, NL80211_ATTR_WIPHY, rdev->wiphy_idx) ||
+ 	    nla_put_u32(msg, NL80211_ATTR_IFINDEX, netdev->ifindex) ||
+-	    (bssid && nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, bssid)) ||
++	    (cr->bssid && nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, cr->bssid)) ||
+ 	    nla_put_u16(msg, NL80211_ATTR_STATUS_CODE,
+-			status < 0 ? WLAN_STATUS_UNSPECIFIED_FAILURE :
+-			status) ||
+-	    (status < 0 && nla_put_flag(msg, NL80211_ATTR_TIMED_OUT)) ||
+-	    (req_ie &&
+-	     nla_put(msg, NL80211_ATTR_REQ_IE, req_ie_len, req_ie)) ||
+-	    (resp_ie &&
+-	     nla_put(msg, NL80211_ATTR_RESP_IE, resp_ie_len, resp_ie)) ||
+-	    (update_erp_next_seq_num &&
++			cr->status < 0 ? WLAN_STATUS_UNSPECIFIED_FAILURE :
++			cr->status) ||
++	    (cr->status < 0 && nla_put_flag(msg, NL80211_ATTR_TIMED_OUT)) ||
++	    (cr->req_ie &&
++	     nla_put(msg, NL80211_ATTR_REQ_IE, cr->req_ie_len, cr->req_ie)) ||
++	    (cr->resp_ie &&
++	     nla_put(msg, NL80211_ATTR_RESP_IE, cr->resp_ie_len, cr->resp_ie)) ||
++	    (cr->update_erp_next_seq_num &&
+ 	     nla_put_u16(msg, NL80211_ATTR_FILS_ERP_NEXT_SEQ_NUM,
+-			 fils_erp_next_seq_num)) ||
+-	    (status == WLAN_STATUS_SUCCESS &&
+-	    ((fils_kek &&
+-	     nla_put(msg, NL80211_ATTR_FILS_KEK, fils_kek_len, fils_kek)) ||
+-	    (pmk &&
+-	     nla_put(msg, NL80211_ATTR_PMK, pmk_len, pmk)) ||
+-	    (pmkid &&
+-	     nla_put(msg, NL80211_ATTR_PMKID, WLAN_PMKID_LEN, pmkid)))))
++			 cr->fils_erp_next_seq_num)) ||
++	    (cr->status == WLAN_STATUS_SUCCESS &&
++	    ((cr->fils_kek &&
++	     nla_put(msg, NL80211_ATTR_FILS_KEK, cr->fils_kek_len, cr->fils_kek)) ||
++	    (cr->pmk &&
++	     nla_put(msg, NL80211_ATTR_PMK, cr->pmk_len, cr->pmk)) ||
++	    (cr->pmkid &&
++	     nla_put(msg, NL80211_ATTR_PMKID, WLAN_PMKID_LEN, cr->pmkid)))))
+ 		goto nla_put_failure;
+ 
+ 	genlmsg_end(msg, hdr);
+diff --git a/net/wireless/nl80211.h b/net/wireless/nl80211.h
+index 62a81f0..2bc7d94 100644
+--- a/net/wireless/nl80211.h
++++ b/net/wireless/nl80211.h
+@@ -55,14 +55,9 @@ void nl80211_send_assoc_timeout(struct cfg80211_registered_device *rdev,
+ 				struct net_device *netdev,
+ 				const u8 *addr, gfp_t gfp);
+ void nl80211_send_connect_result(struct cfg80211_registered_device *rdev,
+-				 struct net_device *netdev, const u8 *bssid,
+-				 const u8 *req_ie, size_t req_ie_len,
+-				 const u8 *resp_ie, size_t resp_ie_len,
+-				 const u8 *fils_kek, size_t fils_kek_len,
+-				 bool update_erp_next_seq_num,
+-				 u16 fils_erp_next_seq_num, const u8 *pmk,
+-				 size_t pmk_len, const u8 *pmkid,
+-				 int status, gfp_t gfp);
++				 struct net_device *netdev,
++                 struct cfg80211_connect_resp_params *cr,
++				 gfp_t gfp);
+ void nl80211_send_roamed(struct cfg80211_registered_device *rdev,
+ 			 struct net_device *netdev, const u8 *bssid,
+ 			 const u8 *req_ie, size_t req_ie_len,
+diff --git a/net/wireless/sme.c b/net/wireless/sme.c
+index 3b83e82..a40267e 100644
+--- a/net/wireless/sme.c
++++ b/net/wireless/sme.c
+@@ -245,9 +245,12 @@ void cfg80211_conn_work(struct work_struct *work)
+ 			bssid = bssid_buf;
+ 		}
+ 		if (cfg80211_conn_do_work(wdev)) {
+-			__cfg80211_connect_result(
+-					wdev->netdev, bssid,
+-					NULL, 0, NULL, 0, -1, false, NULL, NULL);
++            struct cfg80211_connect_resp_params cr;
++
++            memset(&cr, 0, sizeof(cr));
++            cr.status = -1;
++            cr.bssid = bssid;
++			__cfg80211_connect_result(wdev->netdev, &cr, false);
+ 		}
+ 		wdev_unlock(wdev);
+ 	}
+@@ -350,9 +353,13 @@ void cfg80211_sme_rx_auth(struct wireless_dev *wdev, const u8 *buf, size_t len)
+ 		wdev->conn->state = CFG80211_CONN_AUTHENTICATE_NEXT;
+ 		schedule_work(&rdev->conn_work);
+ 	} else if (status_code != WLAN_STATUS_SUCCESS) {
+-		__cfg80211_connect_result(wdev->netdev, mgmt->bssid,
+-					  NULL, 0, NULL, 0,
+-					  status_code, false, NULL, NULL);
++        struct cfg80211_connect_resp_params cr;
++
++        memset(&cr, 0, sizeof(cr));
++        cr.status = status_code;
++        cr.bssid = mgmt->bssid;
++        cr.timeout_reason = NL80211_TIMEOUT_UNSPECIFIED;
++		__cfg80211_connect_result(wdev->netdev, &cr, false);
+ 	} else if (wdev->conn->state == CFG80211_CONN_AUTHENTICATING) {
+ 		wdev->conn->state = CFG80211_CONN_ASSOCIATE_NEXT;
+ 		schedule_work(&rdev->conn_work);
+@@ -657,12 +664,9 @@ static DECLARE_WORK(cfg80211_disconnect_work, disconnect_work);
+  */
+ 
+ /* This method must consume bss one way or another */
+-void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+-			       const u8 *req_ie, size_t req_ie_len,
+-			       const u8 *resp_ie, size_t resp_ie_len,
+-			       int status, bool wextev,
+-			       struct cfg80211_bss *bss,
+-                   struct cfg80211_connect_resp_params *cr)
++void __cfg80211_connect_result(struct net_device *dev,
++                   struct cfg80211_connect_resp_params *cr,
++			       bool wextev)
+ {
+ 	struct wireless_dev *wdev = dev->ieee80211_ptr;
+ 	const u8 *country_ie;
+@@ -674,60 +678,46 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+ 
+ 	if (WARN_ON(wdev->iftype != NL80211_IFTYPE_STATION &&
+ 		    wdev->iftype != NL80211_IFTYPE_P2P_CLIENT)) {
+-		cfg80211_put_bss(wdev->wiphy, bss);
++		cfg80211_put_bss(wdev->wiphy, cr->bss);
+ 		return;
+ 	}
+ 
+-    if (cr && cr->fils_kek_len) {
+-	    nl80211_send_connect_result(wiphy_to_rdev(wdev->wiphy), dev,
+-				    bssid, req_ie, req_ie_len,
+-				    resp_ie, resp_ie_len,
+-				    cr->fils_kek, cr->fils_kek_len,
+-                    cr->update_erp_next_seq_num,
+-                    cr->fils_erp_next_seq_num,
+-                    cr->pmk, cr->pmk_len, cr->pmkid,
+-				    status, GFP_KERNEL);
+-    }else {
+-	    nl80211_send_connect_result(wiphy_to_rdev(wdev->wiphy), dev,
+-				    bssid, req_ie, req_ie_len,
+-				    resp_ie, resp_ie_len,
+-				    NULL, 0, 0, 0, NULL, 0, NULL,
+-				    status, GFP_KERNEL);
+-    }
++    nl80211_send_connect_result(wiphy_to_rdev(wdev->wiphy), dev,
++                                cr, GFP_KERNEL);
+ 
+ #ifdef CONFIG_CFG80211_WEXT
+ 	if (wextev) {
+-		if (req_ie && status == WLAN_STATUS_SUCCESS) {
++		if (cr->req_ie && cr->status == WLAN_STATUS_SUCCESS) {
+ 			memset(&wrqu, 0, sizeof(wrqu));
+-			wrqu.data.length = req_ie_len;
+-			wireless_send_event(dev, IWEVASSOCREQIE, &wrqu, req_ie);
++			wrqu.data.length = cr->req_ie_len;
++			wireless_send_event(dev, IWEVASSOCREQIE, &wrqu, cr->req_ie);
+ 		}
+ 
+-		if (resp_ie && status == WLAN_STATUS_SUCCESS) {
++		if (cr->resp_ie && cr->status == WLAN_STATUS_SUCCESS) {
+ 			memset(&wrqu, 0, sizeof(wrqu));
+-			wrqu.data.length = resp_ie_len;
+-			wireless_send_event(dev, IWEVASSOCRESPIE, &wrqu, resp_ie);
++			wrqu.data.length = cr->resp_ie_len;
++			wireless_send_event(dev, IWEVASSOCRESPIE, &wrqu, cr->resp_ie);
+ 		}
+ 
+ 		memset(&wrqu, 0, sizeof(wrqu));
+ 		wrqu.ap_addr.sa_family = ARPHRD_ETHER;
+-		if (bssid && status == WLAN_STATUS_SUCCESS) {
+-			memcpy(wrqu.ap_addr.sa_data, bssid, ETH_ALEN);
+-			memcpy(wdev->wext.prev_bssid, bssid, ETH_ALEN);
++		if (cr->bssid && cr->status == WLAN_STATUS_SUCCESS) {
++			memcpy(wrqu.ap_addr.sa_data, cr->bssid, ETH_ALEN);
++			memcpy(wdev->wext.prev_bssid, cr->bssid, ETH_ALEN);
+ 			wdev->wext.prev_bssid_valid = true;
+ 		}
+ 		wireless_send_event(dev, SIOCGIWAP, &wrqu, NULL);
+ 	}
+ #endif
+ 
+-	if (!bss && (status == WLAN_STATUS_SUCCESS)) {
++	if (!cr->bss && (cr->status == WLAN_STATUS_SUCCESS)) {
+ 		WARN_ON_ONCE(!wiphy_to_rdev(wdev->wiphy)->ops->connect);
+-		bss = cfg80211_get_bss(wdev->wiphy, NULL, bssid,
++		cr->bss = cfg80211_get_bss(wdev->wiphy, NULL, cr->bssid,
+ 				       wdev->ssid, wdev->ssid_len,
+ 				       wdev->conn_bss_type,
+ 				       IEEE80211_PRIVACY_ANY);
+-		if (bss)
+-			cfg80211_hold_bss(bss_from_pub(bss));
++		if (cr->bss)
++			cfg80211_hold_bss(bss_from_pub(cr->bss));
+ 	}
+ 
+ 	if (wdev->current_bss) {
+@@ -736,28 +726,28 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+ 		wdev->current_bss = NULL;
+ 	}
+ 
+-	if (status != WLAN_STATUS_SUCCESS) {
++	if (cr->status != WLAN_STATUS_SUCCESS) {
+ 		kzfree(wdev->connect_keys);
+ 		wdev->connect_keys = NULL;
+ 		wdev->ssid_len = 0;
+-		if (bss) {
+-			cfg80211_unhold_bss(bss_from_pub(bss));
+-			cfg80211_put_bss(wdev->wiphy, bss);
++		if (cr->bss) {
++			cfg80211_unhold_bss(bss_from_pub(cr->bss));
++			cfg80211_put_bss(wdev->wiphy, cr->bss);
+ 		}
+ 		cfg80211_sme_free(wdev);
+ 		return;
+ 	}
+ 
+-	if (WARN_ON(!bss))
++	if (WARN_ON(!cr->bss))
+ 		return;
+ 
+-	wdev->current_bss = bss_from_pub(bss);
++	wdev->current_bss = bss_from_pub(cr->bss);
+ 
+ 	if (!(wdev->wiphy->flags & WIPHY_FLAG_HAS_STATIC_WEP))
+ 		cfg80211_upload_connect_keys(wdev);
+ 
+ 	rcu_read_lock();
+-	country_ie = ieee80211_bss_get_ie(bss, WLAN_EID_COUNTRY);
++	country_ie = ieee80211_bss_get_ie(cr->bss, WLAN_EID_COUNTRY);
+ 	if (!country_ie) {
+ 		rcu_read_unlock();
+ 		return;
+@@ -774,7 +764,7 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+ 	 * - country_ie + 2, the start of the country ie data, and
+ 	 * - and country_ie[1] which is the IE length
+ 	 */
+-	regulatory_hint_country_ie(wdev->wiphy, bss->channel->band,
++	regulatory_hint_country_ie(wdev->wiphy, cr->bss->channel->band,
+ 				   country_ie + 2, country_ie[1]);
+ 	kfree(country_ie);
+ }
+diff --git a/net/wireless/util.c b/net/wireless/util.c
+index ba997c0..93210d1 100644
+--- a/net/wireless/util.c
++++ b/net/wireless/util.c
+@@ -931,7 +931,6 @@ void cfg80211_process_wdev_events(struct wireless_dev *wdev)
+ {
+ 	struct cfg80211_event *ev;
+ 	unsigned long flags;
+-	const u8 *bssid = NULL;
+ 
+ 	spin_lock_irqsave(&wdev->event_lock, flags);
+ 	while (!list_empty(&wdev->event_list)) {
+@@ -943,15 +942,8 @@ void cfg80211_process_wdev_events(struct wireless_dev *wdev)
+ 		wdev_lock(wdev);
+ 		switch (ev->type) {
+ 		case EVENT_CONNECT_RESULT:
+-			if (ev->cr.bssid && !is_zero_ether_addr(ev->cr.bssid))
+-				bssid = ev->cr.bssid;
+-			__cfg80211_connect_result(
+-				wdev->netdev, bssid,
+-				ev->cr.req_ie, ev->cr.req_ie_len,
+-				ev->cr.resp_ie, ev->cr.resp_ie_len,
+-				ev->cr.status,
+-				ev->cr.status == WLAN_STATUS_SUCCESS,
+-				ev->cr.bss, &ev->cr);
++			__cfg80211_connect_result(wdev->netdev, &ev->cr,
++				ev->cr.status == WLAN_STATUS_SUCCESS);
+ 			break;
+ 		case EVENT_ROAMED:
+ 			__cfg80211_roamed(wdev, ev->rm.bss, ev->rm.req_ie,
+-- 
+2.9.3
+

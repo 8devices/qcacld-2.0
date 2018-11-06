@@ -1,0 +1,60 @@
+From fb296460f2f37ee2e9def1a826811229789ddb37 Mon Sep 17 00:00:00 2001
+From: Rajasekaran Kalidoss <rkalidos@codeaurora.org>
+Date: Tue, 23 May 2017 15:31:18 +0530
+Subject: [PATCH] cfg80211: Match 4.9.11+ kernel cfg80211 nl80211_attrs
+
+Match 4.9.11+ kernel cfg80211 nl80211_attrs and FILS enum for
+extended feature with latest kernel - Linux 4.12-rc2
+FILS NL80211 ATTR:
+commit Id - a3caf7440dedd2399f90f27ff11ac390bf03e6c4
+---
+ include/uapi/linux/nl80211.h | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/include/uapi/linux/nl80211.h b/include/uapi/linux/nl80211.h
+index d98bdfc..8a1c113 100644
+--- a/include/uapi/linux/nl80211.h
++++ b/include/uapi/linux/nl80211.h
+@@ -2421,9 +2421,16 @@ enum nl80211_attrs {
+ 	NL80211_ATTR_NAN_FUNC,
+ 	NL80211_ATTR_NAN_MATCH,
+ 
+-	NL80211_ATTR_BSSID,
+ 	NL80211_ATTR_FILS_KEK,
+ 	NL80211_ATTR_FILS_NONCES,
++	NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED,
++
++	NL80211_ATTR_BSSID,
++
++	NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI,
++	NL80211_ATTR_SCHED_SCAN_RSSI_ADJUST,
++
++	NL80211_ATTR_TIMEOUT_REASON,
+ 	NL80211_ATTR_FILS_ERP_USERNAME,
+ 	NL80211_ATTR_FILS_ERP_REALM,
+ 	NL80211_ATTR_FILS_ERP_NEXT_SEQ_NUM,
+@@ -2431,6 +2438,8 @@ enum nl80211_attrs {
+ 	NL80211_ATTR_FILS_CACHE_ID,
+ 
+ 	NL80211_ATTR_PMK,
++	NL80211_ATTR_SCHED_SCAN_MULTI,
++	NL80211_ATTR_SCHED_SCAN_MAX_REQS,
+ 
+ 	/* add attributes here, update the policy in nl80211.c */
+ 
+@@ -4755,7 +4764,11 @@ enum nl80211_ext_feature_index {
+ 	NL80211_EXT_FEATURE_BEACON_RATE_HT,
+ 	NL80211_EXT_FEATURE_BEACON_RATE_VHT,
+ 	NL80211_EXT_FEATURE_FILS_STA,
+-	NL80211_EXT_FEATURE_FILS_SK_OFFLOAD,
++    NL80211_EXT_FEATURE_MGMT_TX_RANDOM_TA,
++    NL80211_EXT_FEATURE_MGMT_TX_RANDOM_TA_CONNECTED,
++    NL80211_EXT_FEATURE_SCHED_SCAN_RELATIVE_RSSI,
++    NL80211_EXT_FEATURE_CQM_RSSI_LIST,
++    NL80211_EXT_FEATURE_FILS_SK_OFFLOAD,
+ 
+ 	/* add new features before the definition below */
+ 	NUM_NL80211_EXT_FEATURES,
+-- 
+2.9.3
+

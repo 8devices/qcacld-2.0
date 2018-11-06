@@ -1,0 +1,1347 @@
+From 220763a45ae4d771b8e37a26074c245cc1e6f418 Mon Sep 17 00:00:00 2001
+From: Jouni Malinen <jouni@qca.qualcomm.com>
+Date: Thu, 27 Oct 2016 00:41:58 +0300
+Subject: [PATCH 1/6] cfg80211: Rename SAE_DATA to more generic AUTH_DATA
+
+This adds defines and nl80211 extensions to allow FILS Authentication to
+be implemented similarly to SAE. FILS does not need the special rules
+for the Authentication transaction number and Status code fields, but it
+does need to add non-IE fields. The previously used
+NL80211_ATTR_SAE_DATA can be reused for this to avoid having to
+duplicate that implementation. Rename that attribute to more generic
+NL80211_ATTR_AUTH_DATA (with backwards compatibility define for
+NL80211_SAE_DATA).
+
+Also document the special rules related to the Authentication
+transaction number and Status code fiels.
+
+git origin:
+https://kernel.googlesource.com/pub/scm/linux/kernel/git/jberg/mac80211-next
+
+commit id: 11b6b5a4ced2f2c76073b97ee08ca0eab8358fde
+
+Signed-off-by: Jouni Malinen <jouni@qca.qualcomm.com>
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ include/net/cfg80211.h       | 12 +++++++-----
+ include/uapi/linux/nl80211.h | 15 ++++++++++++---
+ net/mac80211/mlme.c          | 12 ++++++------
+ net/wireless/core.h          |  2 +-
+ net/wireless/mlme.c          |  6 +++---
+ net/wireless/nl80211.c       | 18 +++++++++---------
+ 6 files changed, 38 insertions(+), 27 deletions(-)
+
+diff --git a/include/net/cfg80211.h b/include/net/cfg80211.h
+index f0beabf..1fad833 100644
+--- a/include/net/cfg80211.h
++++ b/include/net/cfg80211.h
+@@ -1761,9 +1761,11 @@ const u8 *ieee80211_bss_get_ie(struct cfg80211_bss *bss, u8 ie);
+  * @key_len: length of WEP key for shared key authentication
+  * @key_idx: index of WEP key for shared key authentication
+  * @key: WEP key for shared key authentication
+- * @sae_data: Non-IE data to use with SAE or %NULL. This starts with
+- *	Authentication transaction sequence number field.
+- * @sae_data_len: Length of sae_data buffer in octets
++ * @auth_data: Fields and elements in Authentication frames. This contains
++ *	the authentication frame body (non-IE and IE data), excluding the
++ *	Authentication algorithm number, i.e., starting at the Authentication
++ *	transaction sequence number field.
++ * @auth_data_len: Length of auth_data buffer in octets
+  */
+ struct cfg80211_auth_request {
+ 	struct cfg80211_bss *bss;
+@@ -1772,8 +1774,8 @@ struct cfg80211_auth_request {
+ 	enum nl80211_auth_type auth_type;
+ 	const u8 *key;
+ 	u8 key_len, key_idx;
+-	const u8 *sae_data;
+-	size_t sae_data_len;
++	const u8 *auth_data;
++	size_t auth_data_len;
+ };
+ 
+ /**
+diff --git a/include/uapi/linux/nl80211.h b/include/uapi/linux/nl80211.h
+index d3cbe48..c4fe4ce 100644
+--- a/include/uapi/linux/nl80211.h
++++ b/include/uapi/linux/nl80211.h
+@@ -1638,8 +1638,16 @@ enum nl80211_commands {
+  *	the connection request from a station. nl80211_connect_failed_reason
+  *	enum has different reasons of connection failure.
+  *
+- * @NL80211_ATTR_SAE_DATA: SAE elements in Authentication frames. This starts
+- *	with the Authentication transaction sequence number field.
++ * @NL80211_ATTR_AUTH_DATA: Fields and elements in Authentication frames.
++ *	This contains the authentication frame body (non-IE and IE data),
++ *	excluding the Authentication algorithm number, i.e., starting at the
++ *	Authentication transaction sequence number field. It is used with
++ *	authentication algorithms that need special fields to be added into
++ *	the frames (SAE and FILS). Currently, only the SAE cases use the
++ *	initial two fields (Authentication transaction sequence number and
++ *	Status code). However, those fields are included in the attribute data
++ *	for all authentication algorithms to keep the attribute definition
++ *	consistent.
+  *
+  * @NL80211_ATTR_VHT_CAPABILITY: VHT Capability information element (from
+  *	association request when used with NL80211_CMD_NEW_STATION)
+@@ -2198,7 +2206,7 @@ enum nl80211_attrs {
+ 
+ 	NL80211_ATTR_CONN_FAILED_REASON,
+ 
+-	NL80211_ATTR_SAE_DATA,
++	NL80211_ATTR_AUTH_DATA,
+ 
+ 	NL80211_ATTR_VHT_CAPABILITY,
+ 
+@@ -2352,6 +2360,7 @@ enum nl80211_attrs {
+ #define NL80211_ATTR_SCAN_GENERATION NL80211_ATTR_GENERATION
+ #define	NL80211_ATTR_MESH_PARAMS NL80211_ATTR_MESH_CONFIG
+ #define NL80211_ATTR_IFACE_SOCKET_OWNER NL80211_ATTR_SOCKET_OWNER
++#define NL80211_ATTR_SAE_DATA NL80211_ATTR_AUTH_DATA
+ 
+ /*
+  * Allow user space programs to use #ifdef on new attributes by defining them
+diff --git a/net/mac80211/mlme.c b/net/mac80211/mlme.c
+index 1118c61..6f891a9 100644
+--- a/net/mac80211/mlme.c
++++ b/net/mac80211/mlme.c
+@@ -4486,20 +4486,20 @@ int ieee80211_mgd_auth(struct ieee80211_sub_if_data *sdata,
+ 		return -EOPNOTSUPP;
+ 	}
+ 
+-	auth_data = kzalloc(sizeof(*auth_data) + req->sae_data_len +
++	auth_data = kzalloc(sizeof(*auth_data) + req->auth_data_len +
+ 			    req->ie_len, GFP_KERNEL);
+ 	if (!auth_data)
+ 		return -ENOMEM;
+ 
+ 	auth_data->bss = req->bss;
+ 
+-	if (req->sae_data_len >= 4) {
+-		__le16 *pos = (__le16 *) req->sae_data;
++	if (req->auth_data_len >= 4) {
++		__le16 *pos = (__le16 *) req->auth_data;
+ 		auth_data->sae_trans = le16_to_cpu(pos[0]);
+ 		auth_data->sae_status = le16_to_cpu(pos[1]);
+-		memcpy(auth_data->data, req->sae_data + 4,
+-		       req->sae_data_len - 4);
+-		auth_data->data_len += req->sae_data_len - 4;
++		memcpy(auth_data->data, req->auth_data + 4,
++		       req->auth_data_len - 4);
++		auth_data->data_len += req->auth_data_len - 4;
+ 	}
+ 
+ 	if (req->ie && req->ie_len) {
+diff --git a/net/wireless/core.h b/net/wireless/core.h
+index 5f5867f..be4ca39 100644
+--- a/net/wireless/core.h
++++ b/net/wireless/core.h
+@@ -346,7 +346,7 @@ int cfg80211_mlme_auth(struct cfg80211_registered_device *rdev,
+ 		       const u8 *ssid, int ssid_len,
+ 		       const u8 *ie, int ie_len,
+ 		       const u8 *key, int key_len, int key_idx,
+-		       const u8 *sae_data, int sae_data_len);
++		       const u8 *auth_data, int auth_data_len);
+ int cfg80211_mlme_assoc(struct cfg80211_registered_device *rdev,
+ 			struct net_device *dev,
+ 			struct ieee80211_channel *chan,
+diff --git a/net/wireless/mlme.c b/net/wireless/mlme.c
+index 76775a2..4646cf5 100644
+--- a/net/wireless/mlme.c
++++ b/net/wireless/mlme.c
+@@ -216,14 +216,14 @@ int cfg80211_mlme_auth(struct cfg80211_registered_device *rdev,
+ 		       const u8 *ssid, int ssid_len,
+ 		       const u8 *ie, int ie_len,
+ 		       const u8 *key, int key_len, int key_idx,
+-		       const u8 *sae_data, int sae_data_len)
++		       const u8 *auth_data, int auth_data_len)
+ {
+ 	struct wireless_dev *wdev = dev->ieee80211_ptr;
+ 	struct cfg80211_auth_request req = {
+ 		.ie = ie,
+ 		.ie_len = ie_len,
+-		.sae_data = sae_data,
+-		.sae_data_len = sae_data_len,
++		.auth_data = auth_data,
++		.auth_data_len = auth_data_len,
+ 		.auth_type = auth_type,
+ 		.key = key,
+ 		.key_len = key_len,
+diff --git a/net/wireless/nl80211.c b/net/wireless/nl80211.c
+index cd7a419..4e38b43 100644
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -357,7 +357,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
+ 	[NL80211_ATTR_BG_SCAN_PERIOD] = { .type = NLA_U16 },
+ 	[NL80211_ATTR_WDEV] = { .type = NLA_U64 },
+ 	[NL80211_ATTR_USER_REG_HINT_TYPE] = { .type = NLA_U32 },
+-	[NL80211_ATTR_SAE_DATA] = { .type = NLA_BINARY, },
++	[NL80211_ATTR_AUTH_DATA] = { .type = NLA_BINARY, },
+ 	[NL80211_ATTR_VHT_CAPABILITY] = { .len = NL80211_VHT_CAPABILITY_LEN },
+ 	[NL80211_ATTR_SCAN_FLAGS] = { .type = NLA_U32 },
+ 	[NL80211_ATTR_P2P_CTWINDOW] = { .type = NLA_U8 },
+@@ -7723,8 +7723,8 @@ static int nl80211_authenticate(struct sk_buff *skb, struct genl_info *info)
+ 	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+ 	struct net_device *dev = info->user_ptr[1];
+ 	struct ieee80211_channel *chan;
+-	const u8 *bssid, *ssid, *ie = NULL, *sae_data = NULL;
+-	int err, ssid_len, ie_len = 0, sae_data_len = 0;
++	const u8 *bssid, *ssid, *ie = NULL, *auth_data = NULL;
++	int err, ssid_len, ie_len = 0, auth_data_len = 0;
+ 	enum nl80211_auth_type auth_type;
+ 	struct key_parse key;
+ 	bool local_state_change;
+@@ -7805,16 +7805,16 @@ static int nl80211_authenticate(struct sk_buff *skb, struct genl_info *info)
+ 		return -EINVAL;
+ 
+ 	if (auth_type == NL80211_AUTHTYPE_SAE &&
+-	    !info->attrs[NL80211_ATTR_SAE_DATA])
++	    !info->attrs[NL80211_ATTR_AUTH_DATA])
+ 		return -EINVAL;
+ 
+-	if (info->attrs[NL80211_ATTR_SAE_DATA]) {
++	if (info->attrs[NL80211_ATTR_AUTH_DATA]) {
+ 		if (auth_type != NL80211_AUTHTYPE_SAE)
+ 			return -EINVAL;
+-		sae_data = nla_data(info->attrs[NL80211_ATTR_SAE_DATA]);
+-		sae_data_len = nla_len(info->attrs[NL80211_ATTR_SAE_DATA]);
++		auth_data = nla_data(info->attrs[NL80211_ATTR_AUTH_DATA]);
++		auth_data_len = nla_len(info->attrs[NL80211_ATTR_AUTH_DATA]);
+ 		/* need to include at least Auth Transaction and Status Code */
+-		if (sae_data_len < 4)
++		if (auth_data_len < 4)
+ 			return -EINVAL;
+ 	}
+ 
+@@ -7831,7 +7831,7 @@ static int nl80211_authenticate(struct sk_buff *skb, struct genl_info *info)
+ 	err = cfg80211_mlme_auth(rdev, dev, chan, auth_type, bssid,
+ 				 ssid, ssid_len, ie, ie_len,
+ 				 key.p.key, key.p.key_len, key.idx,
+-				 sae_data, sae_data_len);
++				 auth_data, auth_data_len);
+ 	wdev_unlock(dev->ieee80211_ptr);
+ 	return err;
+ }
+-- 
+2.9.3
+
+
+From 5212f1dc26b3bbe4284058d9b1154653be3faa56 Mon Sep 17 00:00:00 2001
+From: Jouni Malinen <jouni@qca.qualcomm.com>
+Date: Thu, 27 Oct 2016 00:42:00 +0300
+Subject: [PATCH 2/6] cfg80211: Add feature flag for Fast Initial Link Setup
+ (FILS) as STA
+
+This defines a feature flag that drivers can use to indicate that they
+support FILS authentication/association (IEEE 802.11ai) when using user
+space SME (NL80211_CMD_AUTHENTICATE) in station mode.
+
+git origin:
+https://kernel.googlesource.com/pub/scm/linux/kernel/git/jberg/mac80211-next
+
+commit id: 60b8084e844814631b57da3d35f272e0ff799ab2
+
+Signed-off-by: Jouni Malinen <jouni@qca.qualcomm.com>
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ include/uapi/linux/nl80211.h | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/include/uapi/linux/nl80211.h b/include/uapi/linux/nl80211.h
+index c4fe4ce..8c04a06 100644
+--- a/include/uapi/linux/nl80211.h
++++ b/include/uapi/linux/nl80211.h
+@@ -4648,6 +4648,8 @@ enum nl80211_feature_flags {
+  *	configuration (AP/mesh) with HT rates.
+  * @NL80211_EXT_FEATURE_BEACON_RATE_VHT: Driver supports beacon rate
+  *	configuration (AP/mesh) with VHT rates.
++ * @NL80211_EXT_FEATURE_FILS_STA: This driver supports Fast Initial Link Setup
++ *	with user space SME (NL80211_CMD_AUTHENTICATE) in station mode.
+  *
+  * @NUM_NL80211_EXT_FEATURES: number of extended features.
+  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
+@@ -4662,6 +4664,7 @@ enum nl80211_ext_feature_index {
+ 	NL80211_EXT_FEATURE_BEACON_RATE_LEGACY,
+ 	NL80211_EXT_FEATURE_BEACON_RATE_HT,
+ 	NL80211_EXT_FEATURE_BEACON_RATE_VHT,
++	NL80211_EXT_FEATURE_FILS_STA,
+ 
+ 	/* add new features before the definition below */
+ 	NUM_NL80211_EXT_FEATURES,
+-- 
+2.9.3
+
+
+From df05bfc9fb7a78a4500acf91752c92c77eae3977 Mon Sep 17 00:00:00 2001
+From: Jouni Malinen <jouni@qca.qualcomm.com>
+Date: Thu, 27 Oct 2016 00:42:01 +0300
+Subject: [PATCH 3/6] cfg80211: Define IEEE P802.11ai (FILS) information
+ elements
+
+Define the Element IDs and Element ID Extensions from IEEE
+P802.11ai/D11.0. In addition, add a new cfg80211_find_ext_ie() wrapper
+to make it easier to find information elements that used the Element ID
+Extension field.
+
+git origin:
+https://kernel.googlesource.com/pub/scm/linux/kernel/git/jberg/mac80211-next
+
+commit id: 3f817fe718c6cb3ddcc2ab04ba86faecc20ef8fe
+
+Signed-off-by: Jouni Malinen <jouni@qca.qualcomm.com>
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ include/linux/ieee80211.h | 20 ++++++++++++++++++++
+ include/net/cfg80211.h    | 21 +++++++++++++++++++++
+ 2 files changed, 41 insertions(+)
+
+diff --git a/include/linux/ieee80211.h b/include/linux/ieee80211.h
+index a80516f..d428adf 100644
+--- a/include/linux/ieee80211.h
++++ b/include/linux/ieee80211.h
+@@ -1960,6 +1960,26 @@ enum ieee80211_eid {
+ 
+ 	WLAN_EID_VENDOR_SPECIFIC = 221,
+ 	WLAN_EID_QOS_PARAMETER = 222,
++	WLAN_EID_CAG_NUMBER = 237,
++	WLAN_EID_AP_CSN = 239,
++	WLAN_EID_FILS_INDICATION = 240,
++	WLAN_EID_DILS = 241,
++	WLAN_EID_FRAGMENT = 242,
++	WLAN_EID_EXTENSION = 255
++};
++
++/* Element ID Extensions for Element ID 255 */
++enum ieee80211_eid_ext {
++	WLAN_EID_EXT_ASSOC_DELAY_INFO = 1,
++	WLAN_EID_EXT_FILS_REQ_PARAMS = 2,
++	WLAN_EID_EXT_FILS_KEY_CONFIRM = 3,
++	WLAN_EID_EXT_FILS_SESSION = 4,
++	WLAN_EID_EXT_FILS_HLP_CONTAINER = 5,
++	WLAN_EID_EXT_FILS_IP_ADDR_ASSIGN = 6,
++	WLAN_EID_EXT_KEY_DELIVERY = 7,
++	WLAN_EID_EXT_FILS_WRAPPED_DATA = 8,
++	WLAN_EID_EXT_FILS_PUBLIC_KEY = 12,
++	WLAN_EID_EXT_FILS_NONCE = 13,
+ };
+ 
+ /* Action category code */
+diff --git a/include/net/cfg80211.h b/include/net/cfg80211.h
+index 1fad833..d02e3d1 100644
+--- a/include/net/cfg80211.h
++++ b/include/net/cfg80211.h
+@@ -4167,6 +4167,27 @@ static inline const u8 *cfg80211_find_ie(u8 eid, const u8 *ies, int len)
+ }
+ 
+ /**
++ * cfg80211_find_ext_ie - find information element with EID Extension in data
++ *
++ * @ext_eid: element ID Extension
++ * @ies: data consisting of IEs
++ * @len: length of data
++ *
++ * Return: %NULL if the extended element ID could not be found or if
++ * the element is invalid (claims to be longer than the given
++ * data), or a pointer to the first byte of the requested
++ * element, that is the byte containing the element ID.
++ *
++ * Note: There are no checks on the element length other than
++ * having to fit into the given data.
++ */
++static inline const u8 *cfg80211_find_ext_ie(u8 ext_eid, const u8 *ies, int len)
++{
++	return cfg80211_find_ie_match(WLAN_EID_EXTENSION, ies, len,
++				      &ext_eid, 1, 2);
++}
++
++/**
+  * cfg80211_find_vendor_ie - find vendor specific information element in data
+  *
+  * @oui: vendor OUI
+-- 
+2.9.3
+
+
+From 5600947d95689009cf6b9db2e3168885550d9f61 Mon Sep 17 00:00:00 2001
+From: Jouni Malinen <jouni@qca.qualcomm.com>
+Date: Thu, 27 Oct 2016 00:42:02 +0300
+Subject: [PATCH 4/6] cfg80211: Add Fast Initial Link Setup (FILS) auth algs
+
+This defines authentication algorithms for FILS (IEEE 802.11ai).
+
+git origin:
+https://kernel.googlesource.com/pub/scm/linux/kernel/git/jberg/mac80211-next
+
+commit id: 631810603a20874554b2f17adf42b72d0f15eda5
+
+Signed-off-by: Jouni Malinen <jouni@qca.qualcomm.com>
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ include/linux/ieee80211.h    |  3 +++
+ include/uapi/linux/nl80211.h |  6 ++++++
+ net/wireless/nl80211.c       | 21 +++++++++++++++++++--
+ 3 files changed, 28 insertions(+), 2 deletions(-)
+
+diff --git a/include/linux/ieee80211.h b/include/linux/ieee80211.h
+index d428adf..793a017 100644
+--- a/include/linux/ieee80211.h
++++ b/include/linux/ieee80211.h
+@@ -1576,6 +1576,9 @@ struct ieee80211_vht_operation {
+ #define WLAN_AUTH_SHARED_KEY 1
+ #define WLAN_AUTH_FT 2
+ #define WLAN_AUTH_SAE 3
++#define WLAN_AUTH_FILS_SK 4
++#define WLAN_AUTH_FILS_SK_PFS 5
++#define WLAN_AUTH_FILS_PK 6
+ #define WLAN_AUTH_LEAP 128
+ 
+ #define WLAN_AUTH_CHALLENGE_LEN 128
+diff --git a/include/uapi/linux/nl80211.h b/include/uapi/linux/nl80211.h
+index 8c04a06..44f0262 100644
+--- a/include/uapi/linux/nl80211.h
++++ b/include/uapi/linux/nl80211.h
+@@ -3674,6 +3674,9 @@ enum nl80211_bss_status {
+  * @NL80211_AUTHTYPE_FT: Fast BSS Transition (IEEE 802.11r)
+  * @NL80211_AUTHTYPE_NETWORK_EAP: Network EAP (some Cisco APs and mainly LEAP)
+  * @NL80211_AUTHTYPE_SAE: Simultaneous authentication of equals
++ * @NL80211_AUTHTYPE_FILS_SK: Fast Initial Link Setup shared key
++ * @NL80211_AUTHTYPE_FILS_SK_PFS: Fast Initial Link Setup shared key with PFS
++ * @NL80211_AUTHTYPE_FILS_PK: Fast Initial Link Setup public key
+  * @__NL80211_AUTHTYPE_NUM: internal
+  * @NL80211_AUTHTYPE_MAX: maximum valid auth algorithm
+  * @NL80211_AUTHTYPE_AUTOMATIC: determine automatically (if necessary by
+@@ -3686,6 +3689,9 @@ enum nl80211_auth_type {
+ 	NL80211_AUTHTYPE_FT,
+ 	NL80211_AUTHTYPE_NETWORK_EAP,
+ 	NL80211_AUTHTYPE_SAE,
++	NL80211_AUTHTYPE_FILS_SK,
++	NL80211_AUTHTYPE_FILS_SK_PFS,
++	NL80211_AUTHTYPE_FILS_PK,
+ 
+ 	/* keep last */
+ 	__NL80211_AUTHTYPE_NUM,
+diff --git a/net/wireless/nl80211.c b/net/wireless/nl80211.c
+index 4e38b43..83d0c50 100644
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -3757,12 +3757,23 @@ static bool nl80211_valid_auth_type(struct cfg80211_registered_device *rdev,
+ 		if (!(rdev->wiphy.features & NL80211_FEATURE_SAE) &&
+ 		    auth_type == NL80211_AUTHTYPE_SAE)
+ 			return false;
++		if (!wiphy_ext_feature_isset(&rdev->wiphy,
++					     NL80211_EXT_FEATURE_FILS_STA) &&
++		    (auth_type == NL80211_AUTHTYPE_FILS_SK ||
++		     auth_type == NL80211_AUTHTYPE_FILS_SK_PFS ||
++		     auth_type == NL80211_AUTHTYPE_FILS_PK))
++			return false;
+ 		return true;
+ 	case NL80211_CMD_CONNECT:
+ 	case NL80211_CMD_START_AP:
+ 		/* SAE not supported yet */
+ 		if (auth_type == NL80211_AUTHTYPE_SAE)
+ 			return false;
++		/* FILS not supported yet */
++		if (auth_type == NL80211_AUTHTYPE_FILS_SK ||
++		    auth_type == NL80211_AUTHTYPE_FILS_SK_PFS ||
++		    auth_type == NL80211_AUTHTYPE_FILS_PK)
++			return false;
+ 		return true;
+ 	default:
+ 		return false;
+@@ -7804,12 +7815,18 @@ static int nl80211_authenticate(struct sk_buff *skb, struct genl_info *info)
+ 	if (!nl80211_valid_auth_type(rdev, auth_type, NL80211_CMD_AUTHENTICATE))
+ 		return -EINVAL;
+ 
+-	if (auth_type == NL80211_AUTHTYPE_SAE &&
++	if ((auth_type == NL80211_AUTHTYPE_SAE ||
++	     auth_type == NL80211_AUTHTYPE_FILS_SK ||
++	     auth_type == NL80211_AUTHTYPE_FILS_SK_PFS ||
++	     auth_type == NL80211_AUTHTYPE_FILS_PK) &&
+ 	    !info->attrs[NL80211_ATTR_AUTH_DATA])
+ 		return -EINVAL;
+ 
+ 	if (info->attrs[NL80211_ATTR_AUTH_DATA]) {
+-		if (auth_type != NL80211_AUTHTYPE_SAE)
++		if (auth_type != NL80211_AUTHTYPE_SAE &&
++		    auth_type != NL80211_AUTHTYPE_FILS_SK &&
++		    auth_type != NL80211_AUTHTYPE_FILS_SK_PFS &&
++		    auth_type != NL80211_AUTHTYPE_FILS_PK)
+ 			return -EINVAL;
+ 		auth_data = nla_data(info->attrs[NL80211_ATTR_AUTH_DATA]);
+ 		auth_data_len = nla_len(info->attrs[NL80211_ATTR_AUTH_DATA]);
+-- 
+2.9.3
+
+
+From f5051a2e595c0254f68205a066aba5ed3587bb5a Mon Sep 17 00:00:00 2001
+From: Jouni Malinen <jouni@qca.qualcomm.com>
+Date: Thu, 27 Oct 2016 00:42:03 +0300
+Subject: [PATCH 5/6] cfg80211: Add KEK/nonces for FILS association frames
+
+The new nl80211 attributes can be used to provide KEK and nonces to
+allow the driver to encrypt and decrypt FILS (Re)Association
+Request/Response frames in station mode.
+
+git origin:
+https://kernel.googlesource.com/pub/scm/linux/kernel/git/jberg/mac80211-next
+
+commit id: 348bd456699801920a309c66e382380809fbdf41
+
+Signed-off-by: Jouni Malinen <jouni@qca.qualcomm.com>
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+
+Conflicts:
+
+	include/uapi/linux/nl80211.h
+	net/wireless/nl80211.c
+---
+ include/linux/ieee80211.h    |  3 +++
+ include/net/cfg80211.h       |  9 +++++++++
+ include/uapi/linux/nl80211.h |  7 +++++++
+ net/wireless/nl80211.c       | 12 ++++++++++++
+ 4 files changed, 31 insertions(+)
+
+diff --git a/include/linux/ieee80211.h b/include/linux/ieee80211.h
+index 793a017..fe84932 100644
+--- a/include/linux/ieee80211.h
++++ b/include/linux/ieee80211.h
+@@ -2096,6 +2096,9 @@ enum ieee80211_key_len {
+ #define IEEE80211_GCMP_MIC_LEN		16
+ #define IEEE80211_GCMP_PN_LEN		6
+ 
++#define FILS_NONCE_LEN			16
++#define FILS_MAX_KEK_LEN		64
++
+ /* Public action codes */
+ enum ieee80211_pub_actioncode {
+ 	WLAN_PUB_ACTION_EXT_CHANSW_ANN = 4,
+diff --git a/include/net/cfg80211.h b/include/net/cfg80211.h
+index d02e3d1..0a9986f 100644
+--- a/include/net/cfg80211.h
++++ b/include/net/cfg80211.h
+@@ -1816,6 +1816,12 @@ enum cfg80211_assoc_req_flags {
+  * @ht_capa_mask:  The bits of ht_capa which are to be used.
+  * @vht_capa: VHT capability override
+  * @vht_capa_mask: VHT capability mask indicating which fields to use
++ * @fils_kek: FILS KEK for protecting (Re)Association Request/Response frame or
++ *	%NULL if FILS is not used.
++ * @fils_kek_len: Length of fils_kek in octets
++ * @fils_nonces: FILS nonces (part of AAD) for protecting (Re)Association
++ *	Request/Response frame or %NULL if FILS is not used. This field starts
++ *	with 16 octets of STA Nonce followed by 16 octets of AP Nonce.
+  */
+ struct cfg80211_assoc_request {
+ 	struct cfg80211_bss *bss;
+@@ -1827,6 +1833,9 @@ struct cfg80211_assoc_request {
+ 	struct ieee80211_ht_cap ht_capa;
+ 	struct ieee80211_ht_cap ht_capa_mask;
+ 	struct ieee80211_vht_cap vht_capa, vht_capa_mask;
++	const u8 *fils_kek;
++	size_t fils_kek_len;
++	const u8 *fils_nonces;
+ };
+ 
+ /**
+diff --git a/include/uapi/linux/nl80211.h b/include/uapi/linux/nl80211.h
+index 44f0262..e272d53 100644
+--- a/include/uapi/linux/nl80211.h
++++ b/include/uapi/linux/nl80211.h
+@@ -1944,6 +1944,11 @@ enum nl80211_commands {
+  *	attribute.
+  * @NL80211_ATTR_NAN_MATCH: used to report a match. This is a nested attribute.
+  *	See &enum nl80211_nan_match_attributes.
++ * @NL80211_ATTR_FILS_KEK: KEK for FILS (Re)Association Request/Response frame
++ *	protection.
++ * @NL80211_ATTR_FILS_NONCES: Nonces (part of AAD) for FILS (Re)Association
++ *	Request/Response frame protection. This attribute contains the 16 octet
++ *	STA Nonce followed by 16 octets of AP Nonce.
+  *
+  * @NL80211_ATTR_BSSID: The BSSID of the AP. Note that %NL80211_ATTR_MAC is also
+  *	used in various commands/events for specifying the BSSID.
+@@ -2348,6 +2353,8 @@ enum nl80211_attrs {
+ 	NL80211_ATTR_NAN_MATCH,
+ 
+ 	NL80211_ATTR_BSSID,
++	NL80211_ATTR_FILS_KEK,
++	NL80211_ATTR_FILS_NONCES,
+ 
+ 	/* add attributes here, update the policy in nl80211.c */
+ 
+diff --git a/net/wireless/nl80211.c b/net/wireless/nl80211.c
+index 83d0c50..23ed3b4 100644
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -415,6 +415,9 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
+ 	[NL80211_ATTR_NAN_DUAL] = { .type = NLA_U8 },
+ 	[NL80211_ATTR_NAN_FUNC] = { .type = NLA_NESTED },
+ 	[NL80211_ATTR_BSSID] = { .len = ETH_ALEN },
++	[NL80211_ATTR_FILS_KEK] = { .type = NLA_BINARY,
++				    .len = FILS_MAX_KEK_LEN },
++	[NL80211_ATTR_FILS_NONCES] = { .len = 2 * FILS_NONCE_LEN },
+ };
+ 
+ /* policy for the key attributes */
+@@ -8027,6 +8030,15 @@ static int nl80211_associate(struct sk_buff *skb, struct genl_info *info)
+ 		req.flags |= ASSOC_REQ_USE_RRM;
+ 	}
+ 
++	if (info->attrs[NL80211_ATTR_FILS_KEK]) {
++		req.fils_kek = nla_data(info->attrs[NL80211_ATTR_FILS_KEK]);
++		req.fils_kek_len = nla_len(info->attrs[NL80211_ATTR_FILS_KEK]);
++		if (!info->attrs[NL80211_ATTR_FILS_NONCES])
++			return -EINVAL;
++		req.fils_nonces =
++			nla_data(info->attrs[NL80211_ATTR_FILS_NONCES]);
++	}
++
+ 	err = nl80211_crypto_settings(rdev, info, &req.crypto, 1);
+ 	if (!err) {
+ 		wdev_lock(dev->ieee80211_ptr);
+-- 
+2.9.3
+
+
+From a427ae66431a3418f70efd8f4c676cc17464ee0d Mon Sep 17 00:00:00 2001
+From: Nakul Kachhwaha <nkachh@codeaurora.org>
+Date: Tue, 4 Apr 2017 17:36:28 +0530
+Subject: [PATCH 6/6] cfg80211: Add support for FILS shared key authentication
+ offload
+
+Enhance nl80211 and cfg80211 connect request and response APIs to
+support FILS shared key authentication offload. The new nl80211
+attributes can be used to provide additional information to the driver
+to establish a FILS connection. Also enhance the set/del PMKSA to allow
+support for adding and deleting PMKSA based on FILS cache identifier.
+
+Add a new feature flag that drivers can use to advertize support for
+FILS shared key authentication and association in station mode when
+using their own SME.
+
+git origin:
+https://kernel.googlesource.com/pub/scm/linux/kernel/git/jberg/mac80211-next
+
+commit id: a3caf7440dedd2399f90f27ff11ac390bf03e6c4
+
+---
+ include/linux/ieee80211.h    |  15 ++++
+ include/net/cfg80211.h       | 163 +++++++++++++++++++++++++++++++++++++++----
+ include/uapi/linux/nl80211.h |  99 +++++++++++++++++++++++++-
+ net/wireless/core.h          |  10 +--
+ net/wireless/nl80211.c       |  87 +++++++++++++++++++++--
+ net/wireless/nl80211.h       |   4 ++
+ net/wireless/sme.c           |  82 +++++++++++++++-------
+ 7 files changed, 406 insertions(+), 54 deletions(-)
+
+diff --git a/include/linux/ieee80211.h b/include/linux/ieee80211.h
+index fe84932..0072929 100644
+--- a/include/linux/ieee80211.h
++++ b/include/linux/ieee80211.h
+@@ -1718,6 +1718,9 @@ enum ieee80211_statuscode {
+ 	WLAN_STATUS_REJECT_DSE_BAND = 96,
+ 	WLAN_STATUS_DENIED_WITH_SUGGESTED_BAND_AND_CHANNEL = 99,
+ 	WLAN_STATUS_DENIED_DUE_TO_SPECTRUM_MANAGEMENT = 103,
++	/* 802.11ai */
++	WLAN_STATUS_FILS_AUTHENTICATION_FAILURE = 108,
++	WLAN_STATUS_UNKNOWN_AUTHENTICATION_SERVER = 109,
+ };
+ 
+ 
+@@ -2099,6 +2102,12 @@ enum ieee80211_key_len {
+ #define FILS_NONCE_LEN			16
+ #define FILS_MAX_KEK_LEN		64
+ 
++#define FILS_ERP_MAX_USERNAME_LEN	16
++#define FILS_ERP_MAX_REALM_LEN		253
++#define FILS_ERP_MAX_RRK_LEN		64
++
++#define PMK_MAX_LEN			48
++
+ /* Public action codes */
+ enum ieee80211_pub_actioncode {
+ 	WLAN_PUB_ACTION_EXT_CHANSW_ANN = 4,
+@@ -2321,6 +2330,7 @@ enum ieee80211_sa_query_action {
+ 	WLAN_ACTION_SA_QUERY_RESPONSE = 1,
+ };
+ 
++#define SUITE(oui, id)	(((oui) << 8) | (id))
+ 
+ /* cipher suite selectors */
+ #define WLAN_CIPHER_SUITE_USE_GROUP	0x000FAC00
+@@ -2348,6 +2358,11 @@ enum ieee80211_sa_query_action {
+ #define WLAN_AKM_SUITE_SAE		0x000FAC08
+ #define WLAN_AKM_SUITE_FT_OVER_SAE	0x000FAC09
+ 
++#define WLAN_AKM_SUITE_FILS_SHA256	SUITE(0x000FAC, 14)
++#define WLAN_AKM_SUITE_FILS_SHA384	SUITE(0x000FAC, 15)
++#define WLAN_AKM_SUITE_FT_FILS_SHA256	SUITE(0x000FAC, 16)
++#define WLAN_AKM_SUITE_FT_FILS_SHA384	SUITE(0x000FAC, 17)
++
+ #define WLAN_MAX_KEY_LEN		32
+ 
+ #define WLAN_PMKID_LEN			16
+diff --git a/include/net/cfg80211.h b/include/net/cfg80211.h
+index 0a9986f..ac1da10 100644
+--- a/include/net/cfg80211.h
++++ b/include/net/cfg80211.h
+@@ -1999,7 +1999,22 @@ struct cfg80211_bss_selection {
+  *	the BSSID of the current association, i.e., to the value that is
+  *	included in the Current AP address field of the Reassociation Request
+  *	frame.
++ * @fils_erp_username: EAP re-authentication protocol (ERP) username part of the
++ *     NAI or %NULL if not specified. This is used to construct FILS wrapped
++ *     data IE.
++ * @fils_erp_username_len: Length of @fils_erp_username in octets.
++ * @fils_erp_realm: EAP re-authentication protocol (ERP) realm part of NAI or
++ *     %NULL if not specified. This specifies the domain name of ER server and
++ *     is used to construct FILS wrapped data IE.
++ * @fils_erp_realm_len: Length of @fils_erp_realm in octets.
++ * @fils_erp_next_seq_num: The next sequence number to use in the FILS ERP
++ *     messages. This is also used to construct FILS wrapped data IE.
++ * @fils_erp_rrk: ERP re-authentication Root Key (rRK) used to derive additional
++ *     keys in FILS or %NULL if not specified.
++ * @fils_erp_rrk_len: Length of @fils_erp_rrk in octets.
+  */
++
++
+ struct cfg80211_connect_params {
+ 	struct ieee80211_channel *channel;
+ 	struct ieee80211_channel *channel_hint;
+@@ -2024,6 +2039,13 @@ struct cfg80211_connect_params {
+ 	bool pbss;
+ 	struct cfg80211_bss_selection bss_select;
+ 	const u8 *prev_bssid;
++	const u8 *fils_erp_username;
++	size_t fils_erp_username_len;
++	const u8 *fils_erp_realm;
++	size_t fils_erp_realm_len;
++	u16 fils_erp_next_seq_num;
++	const u8 *fils_erp_rrk;
++	size_t fils_erp_rrk_len;
+ };
+ 
+ /**
+@@ -2052,10 +2074,25 @@ enum wiphy_params_flags {
+  *
+  * @bssid: The AP's BSSID.
+  * @pmkid: The PMK material itself.
++ * @pmk: The PMK for the PMKSA identified by @pmkid. This is used for key
++ *     derivation by a FILS STA. Otherwise, %NULL.
++ * @pmk_len: Length of the @pmk. The length of @pmk can differ depending on
++ *     the hash algorithm used to generate this.
++ * @ssid: SSID to specify the ESS within which a PMKSA is valid when using FILS
++ *     cache identifier (may be %NULL).
++ * @ssid_len: Length of the @ssid in octets.
++ * @cache_id: 2-octet cache identifier advertized by a FILS AP identifying the
++ *     scope of PMKSA. This is valid only if @ssid_len is non-zero (may be
++ *     %NULL).
+  */
+ struct cfg80211_pmksa {
+ 	const u8 *bssid;
+ 	const u8 *pmkid;
++	const u8 *pmk;
++	size_t pmk_len;
++	const u8 *ssid;
++	size_t ssid_len;
++	const u8 *cache_id;
+ };
+ 
+ /**
+@@ -4996,30 +5033,130 @@ static inline void cfg80211_testmode_event(struct sk_buff *skb, gfp_t gfp)
+ #endif
+ 
+ /**
++ * struct cfg80211_connect_resp_params - Connection response params
++ * @status: Status code, %WLAN_STATUS_SUCCESS for successful connection, use
++ *      %WLAN_STATUS_UNSPECIFIED_FAILURE if your device cannot give you
++ *      the real status code for failures. If this call is used to report a
++ *      failure due to a timeout (e.g., not receiving an Authentication frame
++ *      from the AP) instead of an explicit rejection by the AP, -1 is used to
++ *      indicate that this is a failure, but without a status code.
++ *      @timeout_reason is used to report the reason for the timeout in that
++ *      case.
++ * @bssid: The BSSID of the AP (may be %NULL)
++ * @bss: Entry of bss to which STA got connected to, can be obtained through
++ *      cfg80211_get_bss() (may be %NULL). Only one parameter among @bssid and
++ *      @bss needs to be specified.
++ * @req_ie: Association request IEs (may be %NULL)
++ * @req_ie_len: Association request IEs length
++ * @resp_ie: Association response IEs (may be %NULL)
++ * @resp_ie_len: Association response IEs length
++ * @fils_kek: KEK derived from a successful FILS connection (may be %NULL)
++ * @fils_kek_len: Length of @fils_kek in octets
++ * @update_erp_next_seq_num: Boolean value to specify whether the value in
++ *      @fils_erp_next_seq_num is valid.
++ * @fils_erp_next_seq_num: The next sequence number to use in ERP message in
++ *      FILS Authentication. This value should be specified irrespective of the
++ *      status for a FILS connection.
++ * @pmk: A new PMK if derived from a successful FILS connection (may be %NULL).
++ * @pmk_len: Length of @pmk in octets
++ * @pmkid: A new PMKID if derived from a successful FILS connection or the PMKID
++ *      used for this FILS connection (may be %NULL).
++ * @timeout_reason: Reason for connection timeout. This is used when the
++ *      connection fails due to a timeout instead of an explicit rejection from
++ *      the AP. %NL80211_TIMEOUT_UNSPECIFIED is used when the timeout reason is
++ *      not known. This value is used only if @status < 0 to indicate that the
++ *      failure is due to a timeout and not due to explicit rejection by the AP.
++ *      This value is ignored in other cases (@status >= 0).
++ */
++struct cfg80211_connect_resp_params {
++	int status;
++	const u8 *bssid;
++	struct cfg80211_bss *bss;
++	const u8 *req_ie;
++	size_t req_ie_len;
++	const u8 *resp_ie;
++	size_t resp_ie_len;
++	const u8 *fils_kek;
++	size_t fils_kek_len;
++	bool update_erp_next_seq_num;
++	u16 fils_erp_next_seq_num;
++	const u8 *pmk;
++	size_t pmk_len;
++	const u8 *pmkid;
++	enum nl80211_timeout_reason timeout_reason;
++};
++
++/**
++ * cfg80211_connect_done - notify cfg80211 of connection result
++ *
++ * @dev: network device
++ * @params: connection response parameters
++ * @gfp: allocation flags
++ *
++ * It should be called by the underlying driver once execution of the connection
++ * request from connect() has been completed. This is similar to
++ * cfg80211_connect_bss(), but takes a structure pointer for connection response
++ * parameters. Only one of the functions among cfg80211_connect_bss(),
++ * cfg80211_connect_result(), cfg80211_connect_timeout(),
++ * and cfg80211_connect_done() should be called.
++ */
++void cfg80211_connect_done(struct net_device *dev,
++			struct cfg80211_connect_resp_params *params,
++			gfp_t gfp);
++
++/**
+  * cfg80211_connect_bss - notify cfg80211 of connection result
+  *
+  * @dev: network device
+  * @bssid: the BSSID of the AP
+  * @bss: entry of bss to which STA got connected to, can be obtained
+- *	through cfg80211_get_bss (may be %NULL)
++ *      through cfg80211_get_bss (may be %NULL)
+  * @req_ie: association request IEs (maybe be %NULL)
+  * @req_ie_len: association request IEs length
+  * @resp_ie: association response IEs (may be %NULL)
+  * @resp_ie_len: assoc response IEs length
+- * @status: status code, 0 for successful connection, use
++ * @status: status code, %WLAN_STATUS_SUCCESS for successful connection, use
+  *      %WLAN_STATUS_UNSPECIFIED_FAILURE if your device cannot give you
+- *      the real status code for failures.
++ *      the real status code for failures. If this call is used to report a
++ *      failure due to a timeout (e.g., not receiving an Authentication frame
++ *      from the AP) instead of an explicit rejection by the AP, -1 is used to
++ *      indicate that this is a failure, but without a status code.
++ *      @timeout_reason is used to report the reason for the timeout in that
++ *      case.
+  * @gfp: allocation flags
+- *
+- * It should be called by the underlying driver whenever connect() has
+- * succeeded. This is similar to cfg80211_connect_result(), but with the
+- * option of identifying the exact bss entry for the connection. Only one of
+- * these functions should be called.
+- */
+-void cfg80211_connect_bss(struct net_device *dev, const u8 *bssid,
+-			  struct cfg80211_bss *bss, const u8 *req_ie,
+-			  size_t req_ie_len, const u8 *resp_ie,
+-			  size_t resp_ie_len, int status, gfp_t gfp);
++ * @timeout_reason: reason for connection timeout. This is used when the
++ *      connection fails due to a timeout instead of an explicit rejection from
++ *      the AP. %NL80211_TIMEOUT_UNSPECIFIED is used when the timeout reason is
++ *      not known. This value is used only if @status < 0 to indicate that the
++ *      failure is due to a timeout and not due to explicit rejection by the AP.
++ *      This value is ignored in other cases (@status >= 0).
++ *
++ * It should be called by the underlying driver once execution of the connection
++ * request from connect() has been completed. This is similar to
++ * cfg80211_connect_result(), but with the option of identifying the exact bss
++ * entry for the connection. Only one of the functions among
++ * cfg80211_connect_bss(), cfg80211_connect_result(),
++ * cfg80211_connect_timeout(), and cfg80211_connect_done() should be called.
++ */
++static inline void
++cfg80211_connect_bss(struct net_device *dev, const u8 *bssid,
++		     struct cfg80211_bss *bss, const u8 *req_ie,
++		     size_t req_ie_len, const u8 *resp_ie,
++		     size_t resp_ie_len, int status, gfp_t gfp)
++{
++	struct cfg80211_connect_resp_params params;
++
++	memset(&params, 0, sizeof(params));
++	params.status = status;
++	params.bssid = bssid;
++	params.bss = bss;
++	params.req_ie = req_ie;
++	params.req_ie_len = req_ie_len;
++	params.resp_ie = resp_ie;
++	params.resp_ie_len = resp_ie_len;
++
++	cfg80211_connect_done(dev, &params, gfp);
++}
+ 
+ /**
+  * cfg80211_connect_result - notify cfg80211 of connection result
+diff --git a/include/uapi/linux/nl80211.h b/include/uapi/linux/nl80211.h
+index e272d53..d98bdfc 100644
+--- a/include/uapi/linux/nl80211.h
++++ b/include/uapi/linux/nl80211.h
+@@ -172,6 +172,42 @@
+  * Multiple such rules can be created.
+  */
+ 
++ /**
++ * DOC: FILS shared key authentication offload
++ *
++ * FILS shared key authentication offload can be advertized by drivers by
++ * setting @NL80211_EXT_FEATURE_FILS_SK_OFFLOAD flag. The drivers that support
++ * FILS shared key authentication offload should be able to construct the
++ * authentication and association frames for FILS shared key authentication and
++ * eventually do a key derivation as per IEEE 802.11ai. The below additional
++ * parameters should be given to driver in %NL80211_CMD_CONNECT.
++ *     %NL80211_ATTR_FILS_ERP_USERNAME - used to construct keyname_nai
++ *     %NL80211_ATTR_FILS_ERP_REALM - used to construct keyname_nai
++ *     %NL80211_ATTR_FILS_ERP_NEXT_SEQ_NUM - used to construct erp message
++ *     %NL80211_ATTR_FILS_ERP_RRK - used to generate the rIK and rMSK
++ * rIK should be used to generate an authentication tag on the ERP message and
++ * rMSK should be used to derive a PMKSA.
++ * rIK, rMSK should be generated and keyname_nai, sequence number should be used
++ * as specified in IETF RFC 6696.
++ *
++ * When FILS shared key authentication is completed, driver needs to provide the
++ * below additional parameters to userspace.
++ *     %NL80211_ATTR_FILS_KEK - used for key renewal
++ *     %NL80211_ATTR_FILS_ERP_NEXT_SEQ_NUM - used in further EAP-RP exchanges
++ *     %NL80211_ATTR_PMKID - used to identify the PMKSA used/generated
++ *     %Nl80211_ATTR_PMK - used to update PMKSA cache in userspace
++ * The PMKSA can be maintained in userspace persistently so that it can be used
++ * later after reboots or wifi turn off/on also.
++ *
++ * %NL80211_ATTR_FILS_CACHE_ID is the cache identifier advertized by a FILS
++ * capable AP supporting PMK caching. It specifies the scope within which the
++ * PMKSAs are cached in an ESS. %NL80211_CMD_SET_PMKSA and
++ * %NL80211_CMD_DEL_PMKSA are enhanced to allow support for PMKSA caching based
++ * on FILS cache identifier. Additionally %NL80211_ATTR_PMK is used with
++ * %NL80211_SET_PMKSA to specify the PMK corresponding to a PMKSA for driver to
++ * use in a FILS shared key connection with PMKSA caching.
++ */
++
+ /**
+  * enum nl80211_commands - supported nl80211 commands
+  *
+@@ -371,9 +407,17 @@
+  *	NL80211_CMD_GET_SURVEY and on the "scan" multicast group)
+  *
+  * @NL80211_CMD_SET_PMKSA: Add a PMKSA cache entry, using %NL80211_ATTR_MAC
+- *	(for the BSSID) and %NL80211_ATTR_PMKID.
++ *	(for the BSSID) and %NL80211_ATTR_PMKID, and optionally %NL80211_ATTR_PMK
++ *     (PMK is used for PTKSA derivation in case of FILS shared key offload) or
++ *     using %NL80211_ATTR_SSID, %NL80211_ATTR_FILS_CACHE_ID,
++ *     %NL80211_ATTR_PMKID, and %NL80211_ATTR_PMK in case of FILS
++ *     authentication where %NL80211_ATTR_FILS_CACHE_ID is the identifier
++ *     advertized by a FILS capable AP identifying the scope of PMKSA in an
++ *     ESS.
+  * @NL80211_CMD_DEL_PMKSA: Delete a PMKSA cache entry, using %NL80211_ATTR_MAC
+- *	(for the BSSID) and %NL80211_ATTR_PMKID.
++ *	(for the BSSID) and %NL80211_ATTR_PMKID or using %NL80211_ATTR_SSID,
++ *     %NL80211_ATTR_FILS_CACHE_ID, and %NL80211_ATTR_PMKID in case of FILS
++ *     authentication.
+  * @NL80211_CMD_FLUSH_PMKSA: Flush all PMKSA cache entries.
+  *
+  * @NL80211_CMD_REG_CHANGE: indicates to userspace the regulatory domain
+@@ -1953,6 +1997,31 @@ enum nl80211_commands {
+  * @NL80211_ATTR_BSSID: The BSSID of the AP. Note that %NL80211_ATTR_MAC is also
+  *	used in various commands/events for specifying the BSSID.
+  *
++ * @NL80211_ATTR_FILS_ERP_USERNAME: EAP Re-authentication Protocol (ERP)
++ *     username part of NAI used to refer keys rRK and rIK. This is used with
++ *     %NL80211_CMD_CONNECT.
++ *
++ * @NL80211_ATTR_FILS_ERP_REALM: EAP Re-authentication Protocol (ERP) realm part
++ *     of NAI specifying the domain name of the ER server. This is used with
++ *     %NL80211_CMD_CONNECT.
++ *
++ * @NL80211_ATTR_FILS_ERP_NEXT_SEQ_NUM: Unsigned 16-bit ERP next sequence number
++ *     to use in ERP messages. This is used in generating the FILS wrapped data
++ *     for FILS authentication and is used with %NL80211_CMD_CONNECT.
++ *
++ * @NL80211_ATTR_FILS_ERP_RRK: ERP re-authentication Root Key (rRK) for the
++ *     NAI specified by %NL80211_ATTR_FILS_ERP_USERNAME and
++ *     %NL80211_ATTR_FILS_ERP_REALM. This is used for generating rIK and rMSK
++ *     from successful FILS authentication and is used with
++ *     %NL80211_CMD_CONNECT.
++ *
++ * @NL80211_ATTR_FILS_CACHE_ID: A 2-octet identifier advertized by a FILS AP
++ *     identifying the scope of PMKSAs. This is used with
++ *     @NL80211_CMD_SET_PMKSA and @NL80211_CMD_DEL_PMKSA.
++ *
++ * @NL80211_ATTR_PMK: PMK for the PMKSA identified by %NL80211_ATTR_PMKID.
++ *     This is used with @NL80211_CMD_SET_PMKSA.
++ *
+  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
+  * @NL80211_ATTR_MAX: highest attribute number currently defined
+  * @__NL80211_ATTR_AFTER_LAST: internal use
+@@ -2355,6 +2424,13 @@ enum nl80211_attrs {
+ 	NL80211_ATTR_BSSID,
+ 	NL80211_ATTR_FILS_KEK,
+ 	NL80211_ATTR_FILS_NONCES,
++	NL80211_ATTR_FILS_ERP_USERNAME,
++	NL80211_ATTR_FILS_ERP_REALM,
++	NL80211_ATTR_FILS_ERP_NEXT_SEQ_NUM,
++	NL80211_ATTR_FILS_ERP_RRK,
++	NL80211_ATTR_FILS_CACHE_ID,
++
++	NL80211_ATTR_PMK,
+ 
+ 	/* add attributes here, update the policy in nl80211.c */
+ 
+@@ -4663,7 +4739,8 @@ enum nl80211_feature_flags {
+  *	configuration (AP/mesh) with VHT rates.
+  * @NL80211_EXT_FEATURE_FILS_STA: This driver supports Fast Initial Link Setup
+  *	with user space SME (NL80211_CMD_AUTHENTICATE) in station mode.
+- *
++ * @NL80211_EXT_FEATURE_FILS_SK_OFFLOAD: Driver SME supports FILS shared key
++ *     authentication with %NL80211_CMD_CONNECT.
+  * @NUM_NL80211_EXT_FEATURES: number of extended features.
+  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
+  */
+@@ -4678,6 +4755,7 @@ enum nl80211_ext_feature_index {
+ 	NL80211_EXT_FEATURE_BEACON_RATE_HT,
+ 	NL80211_EXT_FEATURE_BEACON_RATE_VHT,
+ 	NL80211_EXT_FEATURE_FILS_STA,
++	NL80211_EXT_FEATURE_FILS_SK_OFFLOAD,
+ 
+ 	/* add new features before the definition below */
+ 	NUM_NL80211_EXT_FEATURES,
+@@ -4717,6 +4795,21 @@ enum nl80211_connect_failed_reason {
+ };
+ 
+ /**
++ * enum nl80211_timeout_reason - timeout reasons
++ *
++ * @NL80211_TIMEOUT_UNSPECIFIED: Timeout reason unspecified.
++ * @NL80211_TIMEOUT_SCAN: Scan (AP discovery) timed out.
++ * @NL80211_TIMEOUT_AUTH: Authentication timed out.
++ * @NL80211_TIMEOUT_ASSOC: Association timed out.
++ */
++enum nl80211_timeout_reason {
++        NL80211_TIMEOUT_UNSPECIFIED,
++        NL80211_TIMEOUT_SCAN,
++        NL80211_TIMEOUT_AUTH,
++        NL80211_TIMEOUT_ASSOC,
++};
++
++/**
+  * enum nl80211_scan_flags -  scan request control flags
+  *
+  * Scan request control flags are used to control the handling
+diff --git a/net/wireless/core.h b/net/wireless/core.h
+index be4ca39..cf846a7 100644
+--- a/net/wireless/core.h
++++ b/net/wireless/core.h
+@@ -220,15 +220,7 @@ struct cfg80211_event {
+ 	enum cfg80211_event_type type;
+ 
+ 	union {
+-		struct {
+-			u8 bssid[ETH_ALEN];
+-			const u8 *req_ie;
+-			const u8 *resp_ie;
+-			size_t req_ie_len;
+-			size_t resp_ie_len;
+-			struct cfg80211_bss *bss;
+-			int status; /* -1 = failed; 0..65535 = status code */
+-		} cr;
++		struct cfg80211_connect_resp_params cr;
+ 		struct {
+ 			const u8 *req_ie;
+ 			const u8 *resp_ie;
+diff --git a/net/wireless/nl80211.c b/net/wireless/nl80211.c
+index 23ed3b4..cafe945 100644
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -418,6 +418,15 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
+ 	[NL80211_ATTR_FILS_KEK] = { .type = NLA_BINARY,
+ 				    .len = FILS_MAX_KEK_LEN },
+ 	[NL80211_ATTR_FILS_NONCES] = { .len = 2 * FILS_NONCE_LEN },
++	[NL80211_ATTR_FILS_ERP_USERNAME] = { .type = NLA_BINARY,
++					     .len = FILS_ERP_MAX_USERNAME_LEN },
++	[NL80211_ATTR_FILS_ERP_REALM] = { .type = NLA_BINARY,
++					  .len = FILS_ERP_MAX_REALM_LEN },
++	[NL80211_ATTR_FILS_ERP_NEXT_SEQ_NUM] = { .type = NLA_U16 },
++	[NL80211_ATTR_FILS_ERP_RRK] = { .type = NLA_BINARY,
++					.len = FILS_ERP_MAX_RRK_LEN },
++	[NL80211_ATTR_FILS_CACHE_ID] = { .len = 2 },
++	[NL80211_ATTR_PMK] = { .type = NLA_BINARY, .len = PMK_MAX_LEN },
+ };
+ 
+ /* policy for the key attributes */
+@@ -3768,6 +3777,19 @@ static bool nl80211_valid_auth_type(struct cfg80211_registered_device *rdev,
+ 			return false;
+ 		return true;
+ 	case NL80211_CMD_CONNECT:
++		/* SAE not supported yet */
++		if (auth_type == NL80211_AUTHTYPE_SAE)
++			return false;
++		/* FILS with SK PFS or PK not supported yet */
++		if (auth_type == NL80211_AUTHTYPE_FILS_SK_PFS ||
++				auth_type == NL80211_AUTHTYPE_FILS_PK)
++			return false;
++		if (!wiphy_ext_feature_isset(
++					&rdev->wiphy,
++					NL80211_EXT_FEATURE_FILS_SK_OFFLOAD) &&
++				auth_type == NL80211_AUTHTYPE_FILS_SK)
++			return false;
++		return true;
+ 	case NL80211_CMD_START_AP:
+ 		/* SAE not supported yet */
+ 		if (auth_type == NL80211_AUTHTYPE_SAE)
+@@ -8761,6 +8783,33 @@ static int nl80211_connect(struct sk_buff *skb, struct genl_info *info)
+ 		}
+ 	}
+ 
++	if (wiphy_ext_feature_isset(&rdev->wiphy,
++				NL80211_EXT_FEATURE_FILS_SK_OFFLOAD) &&
++			info->attrs[NL80211_ATTR_FILS_ERP_USERNAME] &&
++			info->attrs[NL80211_ATTR_FILS_ERP_REALM] &&
++			info->attrs[NL80211_ATTR_FILS_ERP_NEXT_SEQ_NUM] &&
++			info->attrs[NL80211_ATTR_FILS_ERP_RRK]) {
++		connect.fils_erp_username =
++			nla_data(info->attrs[NL80211_ATTR_FILS_ERP_USERNAME]);
++		connect.fils_erp_username_len =
++			nla_len(info->attrs[NL80211_ATTR_FILS_ERP_USERNAME]);
++		connect.fils_erp_realm =
++			nla_data(info->attrs[NL80211_ATTR_FILS_ERP_REALM]);
++		connect.fils_erp_realm_len =
++			nla_len(info->attrs[NL80211_ATTR_FILS_ERP_REALM]);
++		connect.fils_erp_next_seq_num =
++			nla_get_u16(info->attrs[NL80211_ATTR_FILS_ERP_NEXT_SEQ_NUM]);
++		connect.fils_erp_rrk =
++			nla_data(info->attrs[NL80211_ATTR_FILS_ERP_RRK]);
++		connect.fils_erp_rrk_len =
++			nla_len(info->attrs[NL80211_ATTR_FILS_ERP_RRK]);
++	} else if (info->attrs[NL80211_ATTR_FILS_ERP_USERNAME] ||
++			info->attrs[NL80211_ATTR_FILS_ERP_REALM] ||
++			info->attrs[NL80211_ATTR_FILS_ERP_NEXT_SEQ_NUM] ||
++			info->attrs[NL80211_ATTR_FILS_ERP_RRK]) {
++		kzfree(connkeys);
++		return -EINVAL;
++	}
+ 	wdev_lock(dev->ieee80211_ptr);
+ 	err = cfg80211_connect(rdev, dev, &connect, connkeys,
+ 			       connect.prev_bssid);
+@@ -8836,14 +8885,28 @@ static int nl80211_setdel_pmksa(struct sk_buff *skb, struct genl_info *info)
+ 
+ 	memset(&pmksa, 0, sizeof(struct cfg80211_pmksa));
+ 
+-	if (!info->attrs[NL80211_ATTR_MAC])
+-		return -EINVAL;
+-
+ 	if (!info->attrs[NL80211_ATTR_PMKID])
+ 		return -EINVAL;
+ 
+ 	pmksa.pmkid = nla_data(info->attrs[NL80211_ATTR_PMKID]);
+-	pmksa.bssid = nla_data(info->attrs[NL80211_ATTR_MAC]);
++
++	if (info->attrs[NL80211_ATTR_MAC]) {
++		pmksa.bssid = nla_data(info->attrs[NL80211_ATTR_MAC]);
++	} else if (info->attrs[NL80211_ATTR_SSID] &&
++			info->attrs[NL80211_ATTR_FILS_CACHE_ID] &&
++			(info->genlhdr->cmd == NL80211_CMD_DEL_PMKSA ||
++			 info->attrs[NL80211_ATTR_PMK])) {
++		pmksa.ssid = nla_data(info->attrs[NL80211_ATTR_SSID]);
++		pmksa.ssid_len = nla_len(info->attrs[NL80211_ATTR_SSID]);
++		pmksa.cache_id =
++			nla_data(info->attrs[NL80211_ATTR_FILS_CACHE_ID]);
++	} else {
++		return -EINVAL;
++	}
++	if (info->attrs[NL80211_ATTR_PMK]) {
++		pmksa.pmk = nla_data(info->attrs[NL80211_ATTR_PMK]);
++		pmksa.pmk_len = nla_len(info->attrs[NL80211_ATTR_PMK]);
++	}
+ 
+ 	if (dev->ieee80211_ptr->iftype != NL80211_IFTYPE_STATION &&
+ 	    dev->ieee80211_ptr->iftype != NL80211_IFTYPE_P2P_CLIENT)
+@@ -13119,6 +13182,10 @@ void nl80211_send_connect_result(struct cfg80211_registered_device *rdev,
+ 				 struct net_device *netdev, const u8 *bssid,
+ 				 const u8 *req_ie, size_t req_ie_len,
+ 				 const u8 *resp_ie, size_t resp_ie_len,
++				 const u8 *fils_kek, size_t fils_kek_len,
++				 bool update_erp_next_seq_num,
++				 u16 fils_erp_next_seq_num, const u8 *pmk,
++				 size_t pmk_len, const u8 *pmkid,
+ 				 int status, gfp_t gfp)
+ {
+ 	struct sk_buff *msg;
+@@ -13144,7 +13211,17 @@ void nl80211_send_connect_result(struct cfg80211_registered_device *rdev,
+ 	    (req_ie &&
+ 	     nla_put(msg, NL80211_ATTR_REQ_IE, req_ie_len, req_ie)) ||
+ 	    (resp_ie &&
+-	     nla_put(msg, NL80211_ATTR_RESP_IE, resp_ie_len, resp_ie)))
++	     nla_put(msg, NL80211_ATTR_RESP_IE, resp_ie_len, resp_ie)) ||
++	    (update_erp_next_seq_num &&
++	     nla_put_u16(msg, NL80211_ATTR_FILS_ERP_NEXT_SEQ_NUM,
++			 fils_erp_next_seq_num)) ||
++	    (status == WLAN_STATUS_SUCCESS &&
++	    ((fils_kek &&
++	     nla_put(msg, NL80211_ATTR_FILS_KEK, fils_kek_len, fils_kek)) ||
++	    (pmk &&
++	     nla_put(msg, NL80211_ATTR_PMK, pmk_len, pmk)) ||
++	    (pmkid &&
++	     nla_put(msg, NL80211_ATTR_PMKID, WLAN_PMKID_LEN, pmkid)))))
+ 		goto nla_put_failure;
+ 
+ 	genlmsg_end(msg, hdr);
+diff --git a/net/wireless/nl80211.h b/net/wireless/nl80211.h
+index 7e3821d..62a81f0 100644
+--- a/net/wireless/nl80211.h
++++ b/net/wireless/nl80211.h
+@@ -58,6 +58,10 @@ void nl80211_send_connect_result(struct cfg80211_registered_device *rdev,
+ 				 struct net_device *netdev, const u8 *bssid,
+ 				 const u8 *req_ie, size_t req_ie_len,
+ 				 const u8 *resp_ie, size_t resp_ie_len,
++				 const u8 *fils_kek, size_t fils_kek_len,
++				 bool update_erp_next_seq_num,
++				 u16 fils_erp_next_seq_num, const u8 *pmk,
++				 size_t pmk_len, const u8 *pmkid,
+ 				 int status, gfp_t gfp);
+ void nl80211_send_roamed(struct cfg80211_registered_device *rdev,
+ 			 struct net_device *netdev, const u8 *bssid,
+diff --git a/net/wireless/sme.c b/net/wireless/sme.c
+index 35cc1de..2e65ec6 100644
+--- a/net/wireless/sme.c
++++ b/net/wireless/sme.c
+@@ -680,6 +680,7 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+ 	nl80211_send_connect_result(wiphy_to_rdev(wdev->wiphy), dev,
+ 				    bssid, req_ie, req_ie_len,
+ 				    resp_ie, resp_ie_len,
++				    NULL, 0, 0, 0, NULL, 0, NULL,
+ 				    status, GFP_KERNEL);
+ 
+ #ifdef CONFIG_CFG80211_WEXT
+@@ -767,56 +768,89 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+ }
+ 
+ /* Consumes bss object one way or another */
+-void cfg80211_connect_bss(struct net_device *dev, const u8 *bssid,
+-			  struct cfg80211_bss *bss, const u8 *req_ie,
+-			  size_t req_ie_len, const u8 *resp_ie,
+-			  size_t resp_ie_len, int status, gfp_t gfp)
++void cfg80211_connect_done(struct net_device *dev,
++		struct cfg80211_connect_resp_params *params,
++		gfp_t gfp)
+ {
+ 	struct wireless_dev *wdev = dev->ieee80211_ptr;
+ 	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wdev->wiphy);
+ 	struct cfg80211_event *ev;
+ 	unsigned long flags;
++	u8 *next;
+ 
+-	if (bss) {
++	if (params->bss) {
+ 		/* Make sure the bss entry provided by the driver is valid. */
+-		struct cfg80211_internal_bss *ibss = bss_from_pub(bss);
++		struct cfg80211_internal_bss *ibss = bss_from_pub(params->bss);
+ 
+ 		if (WARN_ON(list_empty(&ibss->list))) {
+-			cfg80211_put_bss(wdev->wiphy, bss);
++			cfg80211_put_bss(wdev->wiphy, params->bss);
+ 			return;
+ 		}
+ 	}
+ 
+-	ev = kzalloc(sizeof(*ev) + req_ie_len + resp_ie_len, gfp);
++	ev = kzalloc(sizeof(*ev) + (params->bssid ? ETH_ALEN : 0) +
++			params->req_ie_len + params->resp_ie_len +
++			params->fils_kek_len + params->pmk_len +
++			(params->pmkid ? WLAN_PMKID_LEN : 0), gfp);
+ 	if (!ev) {
+-		cfg80211_put_bss(wdev->wiphy, bss);
++		cfg80211_put_bss(wdev->wiphy, params->bss);
+ 		return;
+ 	}
+ 
+ 	ev->type = EVENT_CONNECT_RESULT;
+-	if (bssid)
+-		memcpy(ev->cr.bssid, bssid, ETH_ALEN);
+-	if (req_ie_len) {
+-		ev->cr.req_ie = ((u8 *)ev) + sizeof(*ev);
+-		ev->cr.req_ie_len = req_ie_len;
+-		memcpy((void *)ev->cr.req_ie, req_ie, req_ie_len);
++	next = ((u8 *)ev) + sizeof(*ev);
++	if (params->bssid) {
++		ev->cr.bssid = next;
++		memcpy((void *)ev->cr.bssid, params->bssid, ETH_ALEN);
++		next += ETH_ALEN;
+ 	}
+-	if (resp_ie_len) {
+-		ev->cr.resp_ie = ((u8 *)ev) + sizeof(*ev) + req_ie_len;
+-		ev->cr.resp_ie_len = resp_ie_len;
+-		memcpy((void *)ev->cr.resp_ie, resp_ie, resp_ie_len);
++	if (params->req_ie_len) {
++		ev->cr.req_ie = next;
++		ev->cr.req_ie_len = params->req_ie_len;
++		memcpy((void *)ev->cr.req_ie, params->req_ie,
++				params->req_ie_len);
++		next += params->req_ie_len;
+ 	}
+-	if (bss)
+-		cfg80211_hold_bss(bss_from_pub(bss));
+-	ev->cr.bss = bss;
+-	ev->cr.status = status;
++	if (params->resp_ie_len) {
++		ev->cr.resp_ie = next;
++		ev->cr.resp_ie_len = params->resp_ie_len;
++		memcpy((void *)ev->cr.resp_ie, params->resp_ie,
++				params->resp_ie_len);
++		next += params->resp_ie_len;
++	}
++	if (params->fils_kek_len) {
++		ev->cr.fils_kek = next;
++		ev->cr.fils_kek_len = params->fils_kek_len;
++		memcpy((void *)ev->cr.fils_kek, params->fils_kek,
++				params->fils_kek_len);
++		next += params->fils_kek_len;
++	}
++	if (params->pmk_len) {
++		ev->cr.pmk = next;
++		ev->cr.pmk_len = params->pmk_len;
++		memcpy((void *)ev->cr.pmk, params->pmk, params->pmk_len);
++		next += params->pmk_len;
++	}
++	if (params->pmkid) {
++		ev->cr.pmkid = next;
++		memcpy((void *)ev->cr.pmkid, params->pmkid, WLAN_PMKID_LEN);
++		next += WLAN_PMKID_LEN;
++	}
++	ev->cr.update_erp_next_seq_num = params->update_erp_next_seq_num;
++	if (params->update_erp_next_seq_num)
++		ev->cr.fils_erp_next_seq_num = params->fils_erp_next_seq_num;
++	if (params->bss)
++		cfg80211_hold_bss(bss_from_pub(params->bss));
++	ev->cr.bss = params->bss;
++	ev->cr.status = params->status;
++	ev->cr.timeout_reason = params->timeout_reason;
+ 
+ 	spin_lock_irqsave(&wdev->event_lock, flags);
+ 	list_add_tail(&ev->list, &wdev->event_list);
+ 	spin_unlock_irqrestore(&wdev->event_lock, flags);
+ 	queue_work(cfg80211_wq, &rdev->event_work);
+ }
+-EXPORT_SYMBOL(cfg80211_connect_bss);
++EXPORT_SYMBOL(cfg80211_connect_done);
+ 
+ /* Consumes bss object one way or another */
+ void __cfg80211_roamed(struct wireless_dev *wdev,
+-- 
+2.9.3
+
