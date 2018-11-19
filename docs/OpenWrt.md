@@ -3,6 +3,8 @@ Compile qcacld driver for OpenWrt
 
 Note: This example tested on Ubuntu 16.04 other Linux versions may need some tuning.
 
+This example is running OpenWrt on RaspberryPi.
+
 1. Install build essentials:
 
 		sudo apt-get install git build-essential libssl-dev libncurses5-dev unzip \
