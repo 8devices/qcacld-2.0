@@ -3,13 +3,13 @@ Compile qcacld driver for ESPRESSObin
 
 Before compiling qcacld drivers for ESPRESSObin, you have to prepare kernel and buildroot file system. Here is official guides:
  - [Kernel building](http://wiki.espressobin.net/tiki-index.php?page=Build+From+Source+-+Kernel "ESPRESSObin Kernel guide")
- - [Buildroot file system](http://wiki.espressobin.net/tiki-index.php?page=Build+From+Source+-+Buildroot "ESPRESSObin Buildroot filesystem guide") 
+ - [Buildroot file system](http://wiki.espressobin.net/tiki-index.php?page=Build+From+Source+-+Buildroot "ESPRESSObin Buildroot filesystem guide")
  - [Toolchain preparation](http://wiki.espressobin.net/tiki-index.php?page=Build+From+Source+-+Toolchain "ESPRESSObin toolchain download guide")
  - [Booting from USB](http://wiki.espressobin.net/tiki-index.php?page=Boot+from+removable+storage+-+Buildroot "ESPRESSObin booting from USB device")
 
 The main purpose of this guide is to show, how to get started with Red Bean on ESPRESSObin board.
 
-#Preparing Toolchain
+# Preparing Toolchain
 
 1. Create folder and download the toolchain
 
@@ -25,7 +25,7 @@ The main purpose of this guide is to show, how to get started with Red Bean on E
 
 		export PATH=$PATH:/home/espressobin/toolchain/gcc-linaro-5.2-2015.11-2-x86_64_aarch64-linux-gnu/bin
 
-#Preparing kernel sources
+# Preparing kernel sources
 
 1. Create folder and download the sources
 
@@ -33,7 +33,7 @@ The main purpose of this guide is to show, how to get started with Red Bean on E
 		cd kernel/4.4.52/
 		git clone -b linux-4.4.52-armada-17.06 https://github.com/MarvellEmbeddedProcessors/linux-marvell .
 
-2. Apply official ESPRESSObin kernel [patches](wiki.espressobin.net/tiki-download_file.php?fileId=150 "Official ESPRESSObin kernel patches for armada-17.06") 
+2. Apply official ESPRESSObin kernel [patches](wiki.espressobin.net/tiki-download_file.php?fileId=150 "Official ESPRESSObin kernel patches for armada-17.06")
 
 		wget -O kernel_patches.zip "wiki.espressobin.net/tiki-download_file.php?fileId=150"
 		unzip kernel_patches.zip
@@ -76,7 +76,7 @@ The main purpose of this guide is to show, how to get started with Red Bean on E
 
 If the build process finishes successfully, you can find the Image in `arch/arm64/boot/` and device tree blob (armada-3720-community.dtb) in `arch/arm64/boot/dts/marvell/`
 
-#Preparing buildroot file system
+# Preparing buildroot file system
 
 1. Create folder and download the sources
 
@@ -115,7 +115,7 @@ If the build process finishes successfully, you can find the Image in `arch/arm6
 4. Apply ESPRESSObin path to buildroot
 
 		cp ../../qcacld-2.0/ESPRESSObin-patches/Buildroot-fio-reop.patch .
-		patch -p1 < Buildroot-fio-reop.patch 
+		patch -p1 < Buildroot-fio-reop.patch
 
 5. Start building root file system
 
@@ -123,7 +123,7 @@ If the build process finishes successfully, you can find the Image in `arch/arm6
 
 If the build process finishes successfully, you can find the files in `output/images/`
 
-#Building qcacld driver
+# Building qcacld driver
 
 1. Download the sources
 
@@ -142,7 +142,7 @@ If the build process finishes successfully, you can find the files in `output/im
 
 If the build process finishes successfully, you can find the files (wlan-sdio.ko) should be in `qcacld-2.0` directory
 
-#Prepare USB drive 
+# Prepare USB drive
 
 Prepare USB drive to format it and boot from it. Any USB drive above 1GB of storage will do.
 
