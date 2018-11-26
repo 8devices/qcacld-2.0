@@ -33,7 +33,7 @@ The main purpose of this guide is to show, how to get started with Red Bean on E
 		cd kernel/4.4.52/
 		git clone -b linux-4.4.52-armada-17.06 https://github.com/MarvellEmbeddedProcessors/linux-marvell .
 
-2. Apply official ESPRESSObin kernel [patches](wiki.espressobin.net/tiki-download_file.php?fileId=150 "Official ESPRESSObin kernel patches for armada-17.06")
+2. Apply official ESPRESSObin kernel [patches](http://wiki.espressobin.net/tiki-download_file.php?fileId=150 "Official ESPRESSObin kernel patches for armada-17.06")
 
 		wget -O kernel_patches.zip "wiki.espressobin.net/tiki-download_file.php?fileId=150"
 		unzip kernel_patches.zip
