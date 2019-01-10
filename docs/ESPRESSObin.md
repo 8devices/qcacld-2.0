@@ -42,8 +42,8 @@ The main purpose of this guide is to show, how to get started with Red Bean on E
 
 3. Copy and apply the patches qcacld drivers folder
 
-		cp ../../qcacld-2.0/ESPRESSObin-patches/0003-qcacld-gpio-stdio-voltage.patch .
-		cp ../../qcacld-2.0/ESPRESSObin-patches/0004-qcacld-64bit-kernel.patch .
+		cp ../../qcacld-2.0/patches/Marvell-ESPRESSObin/0003-qcacld-gpio-stdio-voltage.patch .
+		cp ../../qcacld-2.0/patches/Marvell-ESPRESSObin/0004-qcacld-64bit-kernel.patch .
 		git apply 0003-qcacld-gpio-stdio-voltage.patch
 		git apply 0004-qcacld-64bit-kernel.patch
 
@@ -114,7 +114,7 @@ If the build process finishes successfully, you can find the Image in `arch/arm6
 
 4. Apply ESPRESSObin path to buildroot
 
-		cp ../../qcacld-2.0/ESPRESSObin-patches/Buildroot-fio-reop.patch .
+		cp ../../qcacld-2.0/patches/Marvell-ESPRESSObin/Buildroot-fio-reop.patch .
 		patch -p1 < Buildroot-fio-reop.patch
 
 5. Start building root file system

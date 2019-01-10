@@ -46,13 +46,13 @@ Compile qcacld driver for Android on RaspberryPi
 
 7. Patch for auto-loading
 
-		patch -p1 -d $ANDROID_BUILD_TOP/device/brcm/rpi3/ < android-patches/0001-load-usb-driver.patch
-		patch -p1 -d $ANDROID_BUILD_TOP/device/brcm/rpi3/ < android-patches/0002-add-usb-blobs.patch
+		patch -p1 -d $ANDROID_BUILD_TOP/device/brcm/rpi3/ < patches/Android/0001-load-usb-driver.patch
+		patch -p1 -d $ANDROID_BUILD_TOP/device/brcm/rpi3/ < patches/Android/0002-add-usb-blobs.patch
 
 	or
 
-		patch -p1 -d $ANDROID_BUILD_TOP/device/brcm/rpi3/ < android-patches/0003-load-sdio-driver.patch
-		patch -p1 -d $ANDROID_BUILD_TOP/device/brcm/rpi3/ < android-patches/0004-add-sdio-blobs.patch
+		patch -p1 -d $ANDROID_BUILD_TOP/device/brcm/rpi3/ < patches/Android/0003-load-sdio-driver.patch
+		patch -p1 -d $ANDROID_BUILD_TOP/device/brcm/rpi3/ < patches/Android/0004-add-sdio-blobs.patch
 
 8. Build Android source
 

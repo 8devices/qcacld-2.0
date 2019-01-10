@@ -1,0 +1,30 @@
+From 12ceec81f1d68bdb096354a2edc6d0e049b7592d Mon Sep 17 00:00:00 2001
+From: Tadas Nevinskas <tadas.n@8devices.com>
+Date: Mon, 14 Jan 2019 13:48:16 +0200
+Subject: [PATCH 1/1] Disable other voltages than 1.8V for SDIO.
+
+---
+ drivers/mmc/core/core.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
+
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index e961a8cf..fdaad21d 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -1692,12 +1692,8 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
+ 	mmc_set_initial_state(host);
+ 
+ 	/* Try to set signal voltage to 3.3V but fall back to 1.8v or 1.2v */
+-	if (__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_330) == 0)
+-		dev_dbg(mmc_dev(host), "Initial signal voltage of 3.3v\n");
+-	else if (__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_180) == 0)
++	__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_180);
+ 		dev_dbg(mmc_dev(host), "Initial signal voltage of 1.8v\n");
+-	else if (__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_120) == 0)
+-		dev_dbg(mmc_dev(host), "Initial signal voltage of 1.2v\n");
+ 
+ 	/*
+ 	 * This delay should be sufficient to allow the power supply
+-- 
+2.19.1
+

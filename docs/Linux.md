@@ -1,44 +1,47 @@
-Compile qcacld driver for Linux
+Compile qcacld driver for Ubuntu with 4.4.0-130 kernel
 =====================================
 
-For cross-compiling edit `scripts/start.sh`, set variables (ARCH, CROSS_COMPILE, KERNEL_SRC) and build:
+Before building, make sure that:
 
-    ./scripts/start.sh
+* Kernel headers are installed
+* cfg80211 module is present
 
-Another way is to pass parameters directly eg:
+Checkout the sources and build the driver:
 
-    ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILER_PATH} KERNEL_SRC=${KERNEL_SRC_PATH} make -j4
+	git clone https://github.com/8devices/qcacld-2.0
+	cd qcacld-2.0/
+	make -j4
 
 To compile only USB or SDIO, use arguments:
 
 For USB:
 
-    ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILER_PATH} KERNEL_SRC=${KERNEL_SRC_PATH} make -j4 wlan-usb
+	make -j4 wlan-usb
 
 For SDIO:
 
-    ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILER_PATH} KERNEL_SRC=${KERNEL_SRC_PATH} make -j4 wlan-sdio
+	make -j4 wlan-sdio
 
 ### Install
 
 USB module:
 
-    cp wlan-usb.ko cfg80211.ko /lib/modules/`uname -r`/
-    cp wlan_firmware-usb/* /lib/firmware/
+	cp wlan-usb.ko /lib/modules/`uname -r`/
+	cp -r firmware/usb/* /lib/firmware/
 
 SDIO module:
 
-    cp wlan-sdio.ko cfg80211.ko /lib/modules/`uname -r`/
-    cp wlan_firmware-sdio/* /lib/firmware/
+	cp wlan-sdio.ko /lib/modules/`uname -r`/
+	cp -r firmware/sdio/* /lib/firmware/
 
 ### Load modules
 
 USB module:
 
-    modprobe cfg80211
-    modprobe wlan-usb
+	modprobe cfg80211
+	modprobe wlan-usb
 
 SDIO module:
 
-    modprobe cfg80211
-    modprobe wlan-sdio
+	modprobe cfg80211
+	modprobe wlan-sdio
