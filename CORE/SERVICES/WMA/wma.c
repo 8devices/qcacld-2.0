@@ -224,6 +224,11 @@ static int wma_nlo_scan_cmp_evt_handler(void *handle, u_int8_t *event,
 
 static enum powersave_qpower_mode wma_get_qpower_config(tp_wma_handle wma);
 
+#ifdef WLAN_OPEN_SOURCE
+int create_peer_cfr_debug_entry(tp_wma_handle wma, void *buf);
+int destroy_peer_cfr_debug_entry(tp_wma_handle wma, void *buf);
+#endif /* WLAN_OPEN_SOURCE */
+
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 /**
  * wma_wow_wakeup_stats_event()- send wow wakeup stats
@@ -1368,10 +1373,20 @@ static int wma_vdev_start_rsp_ind(tp_wma_handle wma, u_int8_t *buf)
 
 	iface = &wma->interfaces[resp_event->vdev_id];
 
+	req_msg = wma_find_vdev_req(wma, resp_event->vdev_id,
+				    WMA_TARGET_REQ_TYPE_VDEV_START);
+
+	if (!req_msg) {
+		WMA_LOGE("%s: Failed to lookup request message for vdev %d",
+			 __func__, resp_event->vdev_id);
+		return -EINVAL;
+	}
+
 	if ((resp_event->vdev_id < wma->max_bssid) &&
 		(adf_os_atomic_read(
 		&wma->interfaces[resp_event->vdev_id].vdev_restart_params.hidden_ssid_restart_in_progress)) &&
-		(wma_is_vdev_in_ap_mode(wma, resp_event->vdev_id) == true)) {
+		(wma_is_vdev_in_ap_mode(wma, resp_event->vdev_id) == true) &&
+		(req_msg->msg_type == WDA_HIDDEN_SSID_VDEV_RESTART)) {
 		WMA_LOGE(
 			"%s: vdev restart event recevied for hidden ssid set using IOCTL",
 			__func__);
@@ -1394,15 +1409,6 @@ static int wma_vdev_start_rsp_ind(tp_wma_handle wma, u_int8_t *buf)
 		                            OL_TXQ_PAUSE_REASON_VDEV_STOP);
 		iface->pause_bitmap &= ~(1 << PAUSE_TYPE_HOST);
 
-	}
-
-	req_msg = wma_find_vdev_req(wma, resp_event->vdev_id,
-				    WMA_TARGET_REQ_TYPE_VDEV_START);
-
-	if (!req_msg) {
-		WMA_LOGE("%s: Failed to lookup request message for vdev %d",
-			 __func__, resp_event->vdev_id);
-		return -EINVAL;
 	}
 
 	vos_timer_stop(&req_msg->event_timeout);
@@ -1784,6 +1790,10 @@ void wma_remove_peer(tp_wma_handle wma, u_int8_t *bssid,
 		peer_addr = peer->mac_addr.raw;
 	}
 #endif
+
+#ifdef WLAN_OPEN_SOURCE
+	destroy_peer_cfr_debug_entry(wma, peer);
+#endif /* WLAN_OPEN_SOURCE */
 
 	wmi_unified_peer_delete_send(wma->wmi_handle, peer_addr, vdev_id);
 
@@ -4751,12 +4761,12 @@ static int wma_extscan_change_results_event_handler(void *handle,
 	tSirWifiSignificantChange  *dest_ap;
 	wmi_extscan_wlan_change_result_bssid    *src_chglist;
 
-	int numap;
+	uint32_t numap;
 	int i, k;
 	u_int8_t *src_rssi;
 	int count = 0;
 	int moredata;
-	int rssi_num = 0;
+	uint32_t rssi_num = 0;
 	u_int32_t buf_len;
 	bool excess_data = false;
 	tpAniSirGlobal pMac = (tpAniSirGlobal )vos_get_context(
@@ -4785,8 +4795,17 @@ static int wma_extscan_change_results_event_handler(void *handle,
 		return -EINVAL;
 	}
 	for (i = 0; i < numap; i++) {
+		if (src_chglist->num_rssi_samples > (UINT_MAX - rssi_num)) {
+			WMA_LOGE("%s: Invalid num of rssi samples %d numap %d rssi_num %d",
+				 __func__, src_chglist->num_rssi_samples,
+				 numap, rssi_num);
+			return -EINVAL;
+		}
 		rssi_num += src_chglist->num_rssi_samples;
+		src_chglist++;
 	}
+	src_chglist = param_buf->bssid_signal_descriptor_list;
+
 	if (event->first_entry_index +
 		event->num_entries_in_page < event->total_entries)
 		moredata = 1;
@@ -5096,7 +5115,7 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 	size_t peer_info_size, peer_stats_size, rate_stats_size;
 	size_t link_stats_results_size;
 	bool excess_data = false;
-	u_int32_t buf_len;
+	u_int32_t buf_len = 0;
 
 	tpAniSirGlobal pMac = (tpAniSirGlobal )vos_get_context(VOS_MODULE_ID_PE,
                                 wma_handle->vos_context);
@@ -5164,7 +5183,7 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 	} while (0);
 
 	if (excess_data ||
-		(sizeof(*fixed_param) > WMA_SVC_MSG_MAX_SIZE - buf_len)) {
+	    (buf_len > WMA_SVC_MSG_MAX_SIZE - sizeof(*fixed_param))) {
 		WMA_LOGE("excess wmi buffer: rates:%d, peers:%d",
 			peer_stats->num_rates, fixed_param->num_peers);
 		VOS_ASSERT(0);
@@ -5433,6 +5452,22 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 	}
 
 	link_stats_results = wma_handle->link_stats_results;
+	if (link_stats_results->num_radio == 0) {
+		link_stats_results->num_radio = fixed_param->num_radio;
+	} else if (link_stats_results->num_radio < fixed_param->num_radio) {
+		/*
+		 * The link stats results size allocated based on num_radio of
+		 * first event must be same as following events. Otherwise these
+		 * events may be spoofed. Drop all of them and report error.
+		 */
+		WMA_LOGE("Invalid following WMI_RADIO_LINK_STATS_EVENTID. Discarding this set");
+		rs_results->tx_time_per_power_level = NULL;
+		vos_mem_free(wma_handle->link_stats_results);
+		wma_handle->link_stats_results = NULL;
+		vos_mem_free(rs_results->tx_time_per_power_level);
+		return -EINVAL;
+	}
+
 	vos_mem_zero(link_stats_results, link_stats_results_size);
 
 	link_stats_results->paramId            = WMI_LINK_STATS_RADIO;
@@ -7948,7 +7983,7 @@ static int wma_nan_rsp_event_handler(void *handle, u_int8_t *event_buf,
 	alloc_len = sizeof(tSirNanEvent);
 	alloc_len += nan_rsp_event_hdr->data_len;
 	if (nan_rsp_event_hdr->data_len > ((WMA_SVC_MSG_MAX_SIZE -
-	    sizeof(*nan_rsp_event_hdr)) / sizeof(u_int8_t)) ||
+	    WMI_TLV_HDR_SIZE - sizeof(*nan_rsp_event_hdr)) / sizeof(u_int8_t)) ||
 	    nan_rsp_event_hdr->data_len > param_buf->num_data)  {
 		WMA_LOGE("excess data length:%d", nan_rsp_event_hdr->data_len);
 		VOS_ASSERT(0);
@@ -8728,7 +8763,7 @@ static int wma_stats_ext_event_handler(void *handle, u_int8_t *event_buf,
 	alloc_len += stats_ext_info->data_len;
 
 	if (stats_ext_info->data_len > (WMA_SVC_MSG_MAX_SIZE -
-	    sizeof(*stats_ext_info)) ||
+	    WMI_TLV_HDR_SIZE - sizeof(*stats_ext_info)) ||
 	    stats_ext_info->data_len > param_buf->num_data) {
 		WMA_LOGE("Excess data_len:%d", stats_ext_info->data_len);
 		VOS_ASSERT(0);
@@ -9725,6 +9760,13 @@ VOS_STATUS WDA_open(v_VOID_t *vos_context, v_VOID_t *os_ctx,
 		goto err_dbglog_init;
 	}
 
+#ifdef WLAN_OPEN_SOURCE
+	vos_status = cfr_capture_init(wma_handle->wmi_handle);
+	if (vos_status != VOS_STATUS_SUCCESS) {
+		WMA_LOGE("%s: Error!!! Could not init CFR RFS", __func__);
+	}
+#endif /* WLAN_OPEN_SOURCE */
+
 	/*
 	 * Update Powersave mode
 	 * 1 - Legacy Powersave + Deepsleep Disabled
@@ -10251,6 +10293,94 @@ out:
 	return status;
 }
 
+int wmi_peer_set_cfr_capture_conf(tp_wma_handle wma, struct wmi_peer_cfr_capture_conf *arg)
+{
+    wmi_peer_cfr_capture_cmd_fixed_param *cmd = NULL;
+    wmi_buf_t buf = NULL;
+    int status = 0, len = 0;
+    struct ol_txrx_peer_t *peer;
+    wmi_unified_t wmi_handle;
+    ol_txrx_pdev_handle txrx_pdev;
+
+    if (!wma) {
+        WMA_LOGE(FL("WMA NULL, can not issue cmd"));
+        return VOS_STATUS_E_INVAL;
+    }
+
+    wmi_handle = wma->wmi_handle;
+    if (!wmi_handle) {
+        WMA_LOGE(FL("WMA is closed, can not issue cmd"));
+        return VOS_STATUS_E_INVAL;
+    }
+
+    len = sizeof(*cmd);
+
+    buf = wmi_buf_alloc(wmi_handle, len);
+    if (!buf) {
+        WMA_LOGE("%s:wmi_buf_alloc failed", __func__);
+        return VOS_STATUS_E_NOMEM;
+    }
+
+    cmd = (wmi_peer_cfr_capture_cmd_fixed_param *) wmi_buf_data(buf);
+    WMITLV_SET_HDR(&cmd->tlv_header,
+                   WMITLV_TAG_STRUC_wmi_peer_cfr_capture_cmd_fixed_param,
+                   WMITLV_GET_STRUCT_TLVLEN(
+                   wmi_peer_cfr_capture_cmd_fixed_param));
+
+    memcpy(&cmd->mac_addr, &arg->peer_macaddr, 6);
+    cmd->request        = arg->request;
+    cmd->vdev_id        = arg->vdev_id;
+    cmd->periodicity    = arg->periodicity;
+    cmd->bandwidth      = arg->bandwidth;
+    cmd->capture_method = arg->capture_method;
+
+    status = wmi_unified_cmd_send(wmi_handle, buf, len,
+                                  WMI_PEER_CFR_CAPTURE_CMDID);
+
+    if (status != EOK) {
+        WMA_LOGE("Failed to send WMI_PEER_CFR_CAPTURE_CMDID command");
+        wmi_buf_free(buf);
+        return VOS_STATUS_E_FAILURE;
+    }
+
+    txrx_pdev = vos_get_context(VOS_MODULE_ID_TXRX, wma->vos_context);
+
+    peer = ol_txrx_peer_find_hash_find(txrx_pdev, (u8 *)&arg->peer_macaddr, 0, 1);
+    if (peer) {
+        peer->cfr_capture.cfr_enable    = arg->request;
+        peer->cfr_capture.cfr_period    = arg->periodicity;
+        peer->cfr_capture.cfr_bandwidth = arg->bandwidth;
+        peer->cfr_capture.cfr_method    = arg->capture_method;
+        adf_os_atomic_dec(&peer->ref_cnt);
+    }
+    return VOS_STATUS_SUCCESS;
+}
+
+int wmi_peer_periodic_cfr_enable(tp_wma_handle wma, u8 cfr_enable)
+{
+    int ret = 0;
+    wmi_unified_t wmi_handle;
+
+    if (!wma) {
+        WMA_LOGE(FL("WMA NULL, can not issue cmd"));
+        return VOS_STATUS_E_INVAL;
+    }
+
+    wmi_handle = wma->wmi_handle;
+    if (!wmi_handle) {
+        WMA_LOGE(FL("WMA is closed, can not issue cmd"));
+        return VOS_STATUS_E_INVAL;
+    }
+
+    ret = wmi_unified_pdev_set_param(wmi_handle,
+                                     WMI_PDEV_PARAM_PER_PEER_PERIODIC_CFR_ENABLE,
+                                     cfr_enable);
+    if (ret) {
+        WMA_LOGE("wmi_unified_vdev_set_param_send failed ret %d", ret);
+    }
+    return ret;
+}
+
 static int wmi_unified_peer_create_send(wmi_unified_t wmi,
 		const u_int8_t *peer_addr, u_int32_t peer_type,
 		u_int32_t vdev_id)
@@ -10315,6 +10445,10 @@ VOS_STATUS wma_create_peer(tp_wma_handle wma, ol_txrx_pdev_handle pdev,
 	}
 	WMA_LOGE("%s: Created peer with peer_addr %pM vdev_id %d, peer_count - %d",
                     __func__, peer_addr, vdev_id, wma->interfaces[vdev_id].peer_count);
+
+#ifdef WLAN_OPEN_SOURCE
+	create_peer_cfr_debug_entry(wma, (void *)peer);
+#endif /* WLAN_OPEN_SOURCE */
 
 #ifdef QCA_IBSS_SUPPORT
 	/* for each remote ibss peer, clear its keys */
@@ -35408,6 +35542,15 @@ VOS_STATUS wma_mc_process_msg(v_VOID_t *vos_context, vos_msg_t *msg)
 			}
 			vos_mem_free(msg->bodyptr);
 			break;
+		case WDA_PEER_CFR_CAPTURE_CONF_CMD:
+			wmi_peer_set_cfr_capture_conf(wma_handle,
+						      (struct wmi_peer_cfr_capture_conf *) msg->bodyptr);
+			vos_mem_free(msg->bodyptr);
+			break;
+		case WDA_PERIODIC_CFR_ENABLE_CMD:
+			wmi_peer_periodic_cfr_enable(wma_handle, *((u8 *)msg->bodyptr));
+			vos_mem_free(msg->bodyptr);
+			break;
 		default:
 			WMA_LOGD("unknow msg type %x", msg->type);
 			/* Do Nothing? MSG Body should be freed at here */
@@ -37037,6 +37180,8 @@ VOS_STATUS wma_start(v_VOID_t *vos_ctx)
 	VOS_STATUS vos_status = VOS_STATUS_SUCCESS;
 	tp_wma_handle wma_handle;
 	int status;
+	struct sAniSirGlobal *mac;
+	uint32_t cfg_val;
 	WMA_LOGD("%s: Enter", __func__);
 
 	wma_handle = vos_get_context(VOS_MODULE_ID_WDA, vos_ctx);
@@ -37048,6 +37193,14 @@ VOS_STATUS wma_start(v_VOID_t *vos_ctx)
 		goto end;
 	}
 
+	mac = (struct sAniSirGlobal*)vos_get_context(VOS_MODULE_ID_PE,
+			wma_handle->vos_context);
+
+	if (NULL == mac) {
+		WMA_LOGE("%s: Failed to get mac", __func__);
+		vos_status = VOS_STATUS_E_INVAL;
+		goto end;
+	}
 
 	status = wmi_unified_register_event_handler(wma_handle->wmi_handle,
 						WMI_SCAN_EVENTID,
@@ -37230,19 +37383,25 @@ VOS_STATUS wma_start(v_VOID_t *vos_ctx)
 		WMA_LOGP("%s: Failed to register tx management", __func__);
 		goto end;
 	}
-	if (VOS_FTM_MODE != vos_get_conparam()) {
-		/* Initialize firmware time stamp sync timer */
-	    vos_status = vos_timer_init(&wma_handle->wma_fw_time_sync_timer,
-	                                VOS_TIMER_TYPE_SW,
-	                                wma_send_time_stamp_sync_cmd,
-	                                wma_handle);
-	    if (vos_status != VOS_STATUS_SUCCESS)
-			WMA_LOGE(FL("Failed to initialize firmware time stamp sync timer"));
 
-	    /* Start firmware time stamp sync timer */
-	    wma_send_time_stamp_sync_cmd(wma_handle);
+	if (wlan_cfgGetInt(mac, WNI_CFG_REMOVE_TIME_SYNC_CMD,
+				   &cfg_val) == eSIR_SUCCESS) {
+		if (cfg_val == 0 && VOS_FTM_MODE != vos_get_conparam()) {
+			/* Initialize firmware time stamp sync timer */
+		    vos_status = vos_timer_init(
+		                   &wma_handle->wma_fw_time_sync_timer,
+		                   VOS_TIMER_TYPE_SW,
+		                   wma_send_time_stamp_sync_cmd,
+		                   wma_handle);
+		    if (vos_status != VOS_STATUS_SUCCESS) {
+				WMA_LOGE(FL("Failed to initialize firmware"
+					"time stamp sync timer"));
+		    }
+
+		    /* Start firmware time stamp sync timer */
+		    wma_send_time_stamp_sync_cmd(wma_handle);
+		}
 	}
-
 	/* Initialize scan completion timeout */
 	vos_status = vos_timer_init(&wma_handle->wma_scan_comp_timer,
 					VOS_TIMER_TYPE_SW,
@@ -37347,6 +37506,8 @@ VOS_STATUS wma_stop(v_VOID_t *vos_ctx, tANI_U8 reason)
 	tp_wma_handle wma_handle;
 	VOS_STATUS vos_status = VOS_STATUS_SUCCESS;
 	int i;
+	struct sAniSirGlobal *mac;
+	uint32_t cfg_val;
 
 	wma_handle = vos_get_context(VOS_MODULE_ID_WDA, vos_ctx);
 
@@ -37355,6 +37516,15 @@ VOS_STATUS wma_stop(v_VOID_t *vos_ctx, tANI_U8 reason)
 	/* validate the wma_handle */
 	if (NULL == wma_handle) {
 		WMA_LOGP("%s: Invalid handle", __func__);
+		vos_status = VOS_STATUS_E_INVAL;
+		goto end;
+	}
+
+	mac = (struct sAniSirGlobal*)vos_get_context(VOS_MODULE_ID_PE,
+			wma_handle->vos_context);
+
+	if (NULL == mac) {
+		WMA_LOGE("%s: Failed to get mac", __func__);
 		vos_status = VOS_STATUS_E_INVAL;
 		goto end;
 	}
@@ -37389,11 +37559,17 @@ VOS_STATUS wma_stop(v_VOID_t *vos_ctx, tANI_U8 reason)
 		WMA_LOGE("Failed to destroy the log completion timer");
 	}
 
-	if (VOS_FTM_MODE != vos_get_conparam()) {
-		/* Destroy firmware time stamp sync timer */
-		vos_status = vos_timer_destroy(&wma_handle->wma_fw_time_sync_timer);
-		if (vos_status != VOS_STATUS_SUCCESS)
-			WMA_LOGE(FL("Failed to destroy the fw time sync timer"));
+	if (wlan_cfgGetInt(mac, WNI_CFG_REMOVE_TIME_SYNC_CMD,
+				   &cfg_val) == eSIR_SUCCESS) {
+		if (cfg_val == 0 && VOS_FTM_MODE != vos_get_conparam()) {
+			/* Destroy firmware time stamp sync timer */
+			vos_status = vos_timer_destroy(
+			               &wma_handle->wma_fw_time_sync_timer);
+			if (vos_status != VOS_STATUS_SUCCESS) {
+				WMA_LOGE(FL("Failed to destroy the"
+					"fw time sync timer"));
+			}
+		}
 	}
 
 	/* There's no need suspend target which is already down during SSR. */
@@ -37622,6 +37798,10 @@ VOS_STATUS wma_close(v_VOID_t *vos_ctx)
 
 	vos_mem_zero(&wma_handle->wow, sizeof(struct wma_wow));
 	wma_runtime_context_deinit(wma_handle);
+
+#ifdef WLAN_OPEN_SOURCE
+        cfr_capture_deinit();
+#endif /* WLAN_OPEN_SOURCE */
 
 	/* unregister Firmware debug log */
 	vos_status = dbglog_deinit(wma_handle->wmi_handle);

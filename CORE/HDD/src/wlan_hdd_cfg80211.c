@@ -4169,6 +4169,11 @@ static int hdd_extscan_start_fill_bucket_channel_spec(
 			total_channels++;
 		}
 
+		if (j != pReqMsg->buckets[bktIndex].numChannels) {
+			hddLog(LOG1, FL("Input parameters didn't match"));
+			return -EINVAL;
+		}
+
 		hdd_extscan_update_dwell_time_limits(
 					pReqMsg, bktIndex,
 					min_dwell_time_active_bucket,
@@ -8697,6 +8702,176 @@ wlan_hdd_cfg80211_thermal_cmd(struct wiphy *wiphy,
 	vos_ssr_unprotect(__func__);
 
 	return ret;
+}
+
+static const struct nla_policy
+qca_vendor_peer_cfr_capture_cfg_policy[QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX + 1] = {
+    [QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR] = { .type = NLA_UNSPEC, .len = ETH_ALEN },
+    [QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE] = { .type = NLA_FLAG },
+    [QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH] = { .type = NLA_U8 },
+    [QCA_WLAN_VENDOR_ATTR_PEER_CFR_PERIODICITY] = { .type = NLA_U32 },
+    [QCA_WLAN_VENDOR_ATTR_PEER_CFR_METHOD] = { .type = NLA_U8 },
+    [QCA_WLAN_VENDOR_ATTR_PERIODIC_CFR_CAPTURE_ENABLE] = { .type = NLA_FLAG },
+};
+
+/**
+ * __wlan_hdd_cfr_capture_cfg_handler() - Handler to configure the CFR Parameters
+ * from user space
+ *
+ * @wiphy:   pointer to wireless wiphy structure.
+ * @wdev:    pointer to wireless_dev structure.
+ * @data:    Pointer to the CFR Parameters
+ * @data_len:Length of the data passed
+ *
+ * Return:   Return Success or Failure
+ */
+static int
+__wlan_hdd_cfr_capture_cfg_handler(struct wiphy *wiphy,
+                                   struct wireless_dev *wdev,
+                                   const void *data, int data_len)
+{
+    struct net_device *dev = wdev->netdev;
+    hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+    hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
+    struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX + 1];
+    struct sme_peer_cfr_capture_conf arg = {0};
+    u8 periodic_cfr_enable = 0;
+    eHalStatus status = eHAL_STATUS_FAILURE;
+
+    if (VOS_FTM_MODE == hdd_get_conparam()) {
+        hddLog(VOS_TRACE_LEVEL_ERROR, FL("Command not allowed in FTM mode"));
+        return -EINVAL;
+    }
+
+    if (wlan_hdd_validate_context(hdd_ctx))
+        return -EINVAL;
+
+    if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX,
+                  data, data_len,
+                  qca_vendor_peer_cfr_capture_cfg_policy)) {
+        hddLog(VOS_TRACE_LEVEL_ERROR, FL("Invalid CFR capture policy attribute"));
+        return -EINVAL;
+    }
+
+    if (!tb[QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR]) {
+        hddLog(VOS_TRACE_LEVEL_ERROR, FL("CFR MAC ADDR attribute needed"));
+        return -EINVAL;
+    }
+
+    ether_addr_copy(arg.peer_macaddr, nla_data(tb[QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR]));
+
+    if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE])
+        arg.request = WMI_PEER_CFR_CAPTURE_ENABLE;
+    else arg.request = WMI_PEER_CFR_CAPTURE_DISABLE;
+
+    if (arg.request == WMI_PEER_CFR_CAPTURE_ENABLE &&
+        (!tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH] ||
+        !tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_PERIODICITY] ||
+        !tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_METHOD])) {
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+               FL("Request for CFR enable, missing attributes\n"));
+        return -EINVAL;
+    }
+
+    if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_PERIODICITY]) {
+        arg.periodicity = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_PERIODICITY]);
+        if (arg.periodicity &&
+            (arg.periodicity < WMI_PEER_CFR_PERIODICITY_MIN ||
+            arg.periodicity > WMI_PEER_CFR_PERIODICITY_MAX)) {
+            hddLog(VOS_TRACE_LEVEL_ERROR, FL("Invalid CFR capture periodicity\n"));
+            return -EINVAL;
+        }
+        if (arg.periodicity % 10) {
+            hddLog(VOS_TRACE_LEVEL_ERROR,
+                   FL("CFR Periodicity should be multiple of 10\n"));
+            return -EINVAL;
+        }
+    }
+
+    if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH]) {
+        arg.bandwidth = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH]);
+        if (arg.bandwidth == NL80211_CHAN_WIDTH_20) {
+            arg.bandwidth = WMI_PEER_CFR_CAPTURE_BW_20MHZ;
+        }
+        else if (arg.bandwidth == NL80211_CHAN_WIDTH_40) {
+            arg.bandwidth = WMI_PEER_CFR_CAPTURE_BW_40MHZ;
+        }
+        else if (arg.bandwidth == NL80211_CHAN_WIDTH_80) {
+            arg.bandwidth = WMI_PEER_CFR_CAPTURE_BW_80MHZ;
+        }
+        else if (arg.bandwidth == NL80211_CHAN_WIDTH_80P80) {
+            arg.bandwidth = WMI_PEER_CFR_CAPTURE_BW_80_80MHZ;
+        }
+        else if (arg.bandwidth == NL80211_CHAN_WIDTH_160) {
+            arg.bandwidth = WMI_PEER_CFR_CAPTURE_BW_160MHZ;
+        }
+        else {
+            hddLog(LOGE, FL("Invalid CFR capture BW\n"));
+            return -EINVAL;
+        }
+        /*TODO Check if requested bandwidth is supported by Peer */
+    }
+
+    if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_METHOD]) {
+        arg.capture_method = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_METHOD]);
+        if (arg.capture_method == QCA_WLAN_VENDOR_CFR_METHOD_QOS_NULL) {
+            arg.capture_method = WMI_PEER_CFR_CAPTURE_METHOD_NULL_FRAME;
+        }
+        else {
+            hddLog(VOS_TRACE_LEVEL_ERROR, FL("CFR method not supported\n"));
+            return -EINVAL;
+        }
+    }
+
+    if (tb[QCA_WLAN_VENDOR_ATTR_PERIODIC_CFR_CAPTURE_ENABLE])
+        periodic_cfr_enable = 1;
+
+    arg.vdev_id = pAdapter->sessionId;
+
+    hddLog(VOS_TRACE_LEVEL_INFO, FL("Peer VdevId = %d"), arg.vdev_id);
+    hddLog(VOS_TRACE_LEVEL_INFO, FL("MAC ADDR = %02x:%02x:%02x:%02x:%02x:%02x"),
+           arg.peer_macaddr[0], arg.peer_macaddr[1], arg.peer_macaddr[2],
+           arg.peer_macaddr[3], arg.peer_macaddr[4], arg.peer_macaddr[5]);
+    hddLog(VOS_TRACE_LEVEL_INFO, FL("CFR Enable = %d"), arg.request);
+    hddLog(VOS_TRACE_LEVEL_INFO, FL("CFR Periodicity = %d"), arg.periodicity);
+    hddLog(VOS_TRACE_LEVEL_INFO, FL("CFR Bandwidth = %d"), arg.bandwidth);
+    hddLog(VOS_TRACE_LEVEL_INFO, FL("CFR Capture Method = %d"), arg.capture_method);
+    hddLog(VOS_TRACE_LEVEL_INFO, FL("CFR Periodic Enable = %d"), periodic_cfr_enable);
+
+    status = sme_cfr_capture_configure(arg);
+    if (eHAL_STATUS_SUCCESS != status)
+        return -EINVAL;
+
+    status = sme_periodic_cfr_enable(periodic_cfr_enable);
+    if (eHAL_STATUS_SUCCESS != status)
+        return -EINVAL;
+
+    return 0;
+}
+
+/**
+ * wlan_hdd_cfr_capture_cfg_handler() - Handler to configure the CFR Parameters
+ * from user space
+ *
+ * @wiphy:   pointer to wireless wiphy structure.
+ * @wdev:    pointer to wireless_dev structure.
+ * @data:    Pointer to the CFR Parameters
+ * @data_len:Length of the data passed
+ *
+ * This is called when QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG is invoked
+ *
+ * Return:   Return Success or Failure
+ */
+static int
+wlan_hdd_cfr_capture_cfg_handler(struct wiphy *wiphy,
+                                 struct wireless_dev *wdev,
+                                 const void *data, int data_len)
+{
+    int ret;
+    vos_ssr_protect(__func__);
+    ret = __wlan_hdd_cfr_capture_cfg_handler(wiphy, wdev, data, data_len);
+    vos_ssr_unprotect(__func__);
+    return ret;
 }
 
 #endif /* FEATURE_WLAN_THERMAL_SHUTDOWN */
@@ -15959,6 +16134,14 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] =
 		.doit = wlan_hdd_cfg80211_thermal_cmd
 	},
 #endif /* FEATURE_WLAN_THERMAL_SHUTDOWN */
+        {
+                .info.vendor_id = QCA_NL80211_VENDOR_ID,
+                .info.subcmd = QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG,
+                .flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+                         WIPHY_VENDOR_CMD_NEED_NETDEV |
+                         WIPHY_VENDOR_CMD_NEED_RUNNING,
+                .doit = wlan_hdd_cfr_capture_cfg_handler,
+        },
 };
 
 /*
@@ -22508,17 +22691,20 @@ int __wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
             !pHddCtx->last_scan_reject_timestamp) {
             pHddCtx->last_scan_reject_session_id = curr_session_id;
             pHddCtx->last_scan_reject_reason = curr_reason;
-            pHddCtx->last_scan_reject_timestamp =
-              jiffies_to_msecs(jiffies) + SCAN_REJECT_THRESHOLD_TIME;
+            pHddCtx->last_scan_reject_timestamp = jiffies +
+                  msecs_to_jiffies(SCAN_REJECT_THRESHOLD_TIME);
             pHddCtx->scan_reject_cnt = 0;
         } else {
             pHddCtx->scan_reject_cnt++;
             if ((pHddCtx->scan_reject_cnt >=
                SCAN_REJECT_THRESHOLD) &&
-               vos_system_time_after(jiffies_to_msecs(jiffies),
+               vos_system_time_after(jiffies,
                pHddCtx->last_scan_reject_timestamp)) {
-		hddLog(LOGE, FL("scan reject threshold reached Session %d reason %d reject cnt %d"),
-			curr_session_id, curr_reason, pHddCtx->scan_reject_cnt);
+        hddLog(LOGE, FL("scan reject threshold reached Session %d reason %d reject cnt %d reject times tamp %lu jiffies %lu"),
+            curr_session_id, curr_reason,
+            pHddCtx->scan_reject_cnt,
+            pHddCtx->last_scan_reject_timestamp,
+            jiffies);
                 pHddCtx->last_scan_reject_timestamp = 0;
                 pHddCtx->scan_reject_cnt = 0;
                 if (pHddCtx->cfg_ini->enable_fatal_event) {
@@ -30696,7 +30882,8 @@ static int wlan_hdd_thermal_resume(hdd_context_t *pHddCtx, bool thermal)
 	}
 
 	/* send auto shutdown timer val 1 to fw as resume */
-	sme_set_auto_shutdown_timer(pHddCtx->hHal, 1);
+	if (thermal)
+		sme_set_auto_shutdown_timer(pHddCtx->hHal, 1);
 
 	return 0;
 }
