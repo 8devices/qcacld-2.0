@@ -23,7 +23,7 @@ The main purpose of this guide is to show, how to get started with Red Bean on E
 
 3. Add toolchain to path. Change your path to toolchain accordingly
 
-		export PATH=$PATH:/home/espressobin/toolchain/gcc-linaro-5.2-2015.11-2-x86_64_aarch64-linux-gnu/bin
+		export PATH=$PATH:/home/user/toolchain/gcc-linaro-5.2-2015.11-2-x86_64_aarch64-linux-gnu/bin
 
 # Preparing kernel sources
 
@@ -98,12 +98,17 @@ If the build process finishes successfully, you can find the Image in `arch/arm6
 		Toolchain -> Custom toolchain
 		Toolchain origin -> Pre-installed toolchain
 		Toolchain path -> path-to-linaro-toolchain-excluding-bin
-		Here set the compiler path as you have configured it when following Toolchain tutorial but excluding the /bin directory (in our case the path was /home/espressobin/toolchain/gcc-linaro-5.2-2015.11-2-x86_64_aarch64-linux-gnu/)
+
+	Here set the compiler path as you have configured it when following Toolchain tutorial but excluding the /bin directory (in our case the path was /home/user/toolchain/gcc-linaro-5.2-2015.11-2-x86_64_aarch64-linux-gnu/)
+
 		Toolchain prefix -> aarch64-linux-gnu
-		Here we set the toolchain prefix excluding the last "-", so this should be aarch64-linux-gnu
+
+	Here we set the toolchain prefix excluding the last "-", so this should be aarch64-linux-gnu
+
 		External toolchain gcc version --> 5.x
 		External toolchain kernel headers series -> 4.0.x
-		Here we set the correct toolchain kernel header series. The toolchain used for building ESPRESSObin Buildroot (as we demonstrated in Toolchain) is Linaro gcc 5.2.1 which uses kernel header 4.0.x 
+
+	Here we set the correct toolchain kernel header series. The toolchain used for building ESPRESSObin Buildroot (as we demonstrated in Toolchain) is Linaro gcc 5.2.1 which uses kernel header 4.0.x
 
 	After setting up the toolchain, additionaly can add other packages to. In our case we only added:
 
