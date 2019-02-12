@@ -1,0 +1,97 @@
+From 337aa7398a3da5a946e2b8c26301b892b21341b4 Mon Sep 17 00:00:00 2001
+From: Johannes Berg <johannes.berg@intel.com>
+Date: Mon, 9 Jan 2017 11:10:42 +0100
+Subject: [PATCH 14/14] cfg80211: size various nl80211 messages correctly
+
+Ilan reported that sometimes nl80211 messages weren't working if
+the frames being transported got very large, which was really a
+problem for userspace-to-kernel messages, but prompted me to look
+at the code.
+
+Upon review, I found various places where variable-length data is
+transported in an nl80211 message but the message isn't allocated
+taking that into account. This shouldn't cause any problems since
+the frames aren't really that long, apart in one place where two
+(possibly very long frames) might not fit.
+
+Fix all the places (that I found) that get variable length data
+from the driver and put it into a message to take the length of
+the variable data into account. The 100 there is just a safe
+constant for the remaining message overhead (it's usually around
+50 for most messages.)
+
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ net/wireless/nl80211.c |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/net/wireless/nl80211.c b/net/wireless/nl80211.c
+index c926d61..5b72f86 100644
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -11827,7 +11827,7 @@ static void nl80211_send_mlme_event(struct cfg80211_registered_device *rdev,
+ 	struct sk_buff *msg;
+ 	void *hdr;
+ 
+-	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, gfp);
++	msg = nlmsg_new(100 + len, gfp);
+ 	if (!msg)
+ 		return;
+ 
+@@ -12039,7 +12039,7 @@ void nl80211_send_roamed(struct cfg80211_registered_device *rdev,
+ 	struct sk_buff *msg;
+ 	void *hdr;
+ 
+-	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, gfp);
++	msg = nlmsg_new(100 + req_ie_len + resp_ie_len, gfp);
+ 	if (!msg)
+ 		return;
+ 
+@@ -12077,7 +12077,7 @@ void nl80211_send_disconnected(struct cfg80211_registered_device *rdev,
+ 	struct sk_buff *msg;
+ 	void *hdr;
+ 
+-	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
++	msg = nlmsg_new(100 + ie_len, GFP_KERNEL);
+ 	if (!msg)
+ 		return;
+ 
+@@ -12154,7 +12154,7 @@ void cfg80211_notify_new_peer_candidate(struct net_device *dev, const u8 *addr,
+ 
+ 	trace_cfg80211_notify_new_peer_candidate(dev, addr);
+ 
+-	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, gfp);
++	msg = nlmsg_new(100 + ie_len, gfp);
+ 	if (!msg)
+ 		return;
+ 
+@@ -12523,7 +12523,7 @@ int nl80211_send_mgmt(struct cfg80211_registered_device *rdev,
+ 	struct sk_buff *msg;
+ 	void *hdr;
+ 
+-	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, gfp);
++	msg = nlmsg_new(100 + len, gfp);
+ 	if (!msg)
+ 		return -ENOMEM;
+ 
+@@ -12566,7 +12566,7 @@ void cfg80211_mgmt_tx_status(struct wireless_dev *wdev, u64 cookie,
+ 
+ 	trace_cfg80211_mgmt_tx_status(wdev, cookie, ack);
+ 
+-	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, gfp);
++	msg = nlmsg_new(100 + len, gfp);
+ 	if (!msg)
+ 		return;
+ 
+@@ -13372,7 +13372,7 @@ void cfg80211_ft_event(struct net_device *netdev,
+ 	if (!ft_event->target_ap)
+ 		return;
+ 
+-	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
++	msg = nlmsg_new(100 + ft_event->ric_ies_len, GFP_KERNEL);
+ 	if (!msg)
+ 		return;
+ 
+-- 
+1.7.9.5
+

@@ -1,0 +1,225 @@
+From f7ffceb87e3088dc83bfdee4954e417fc65f86c4 Mon Sep 17 00:00:00 2001
+From: nakul kachhwaha <nkachh@codeaurora.org>
+Date: Fri, 24 Feb 2017 17:24:59 +0530
+Subject: [PATCH 1/4] Changes for wireless and cfg80211 for v4.4.15 support
+
+[Patch] Pulling the changes from custom 3.10 kernel
+branch for supporting qcacld2.0 on kernel v4.4.15.
+---
+ include/net/cfg80211.h       | 64 ++++++++++++++++++++++++++++++++++++--------
+ include/uapi/linux/nl80211.h |  2 ++
+ net/wireless/reg.c           |  1 +
+ net/wireless/util.c          | 51 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 107 insertions(+), 11 deletions(-)
+
+diff --git a/include/net/cfg80211.h b/include/net/cfg80211.h
+index 2c7bdb8..2d465b2 100644
+--- a/include/net/cfg80211.h
++++ b/include/net/cfg80211.h
+@@ -690,6 +690,18 @@ struct cfg80211_acl_data {
+ 	struct mac_address mac_addrs[];
+ };
+ 
++/*
++ * cfg80211_bitrate_mask - masks for bitrate control
++ */
++struct cfg80211_bitrate_mask {
++	struct {
++		u32 legacy;
++		u8 ht_mcs[IEEE80211_HT_MCS_MASK_LEN];
++		u16 vht_mcs[NL80211_VHT_NSS_MAX];
++		enum nl80211_txrate_gi gi;
++	} control[IEEE80211_NUM_BANDS];
++};
++
+ /**
+  * struct cfg80211_ap_settings - AP configuration
+  *
+@@ -730,6 +742,7 @@ struct cfg80211_ap_settings {
+ 	u8 p2p_ctwindow;
+ 	bool p2p_opp_ps;
+ 	const struct cfg80211_acl_data *acl;
++    struct cfg80211_bitrate_mask beacon_rate;
+ };
+ 
+ /**
+@@ -1555,6 +1568,7 @@ struct cfg80211_sched_scan_request {
+ 	struct cfg80211_ssid *ssids;
+ 	int n_ssids;
+ 	u32 n_channels;
++    u32 interval;
+ 	enum nl80211_bss_scan_width scan_width;
+ 	const u8 *ie;
+ 	size_t ie_len;
+@@ -1930,17 +1944,6 @@ enum wiphy_params_flags {
+ 	WIPHY_PARAM_DYN_ACK		= 1 << 5,
+ };
+ 
+-/*
+- * cfg80211_bitrate_mask - masks for bitrate control
+- */
+-struct cfg80211_bitrate_mask {
+-	struct {
+-		u32 legacy;
+-		u8 ht_mcs[IEEE80211_HT_MCS_MASK_LEN];
+-		u16 vht_mcs[NL80211_VHT_NSS_MAX];
+-		enum nl80211_txrate_gi gi;
+-	} control[IEEE80211_NUM_BANDS];
+-};
+ /**
+  * struct cfg80211_pmksa - PMK Security Association
+  *
+@@ -2827,6 +2830,7 @@ enum wiphy_flags {
+ 	WIPHY_FLAG_HAS_REMAIN_ON_CHANNEL	= BIT(21),
+ 	WIPHY_FLAG_SUPPORTS_5_10_MHZ		= BIT(22),
+ 	WIPHY_FLAG_HAS_CHANNEL_SWITCH		= BIT(23),
++    WIPHY_FLAG_DFS_OFFLOAD                  = BIT(24)
+ };
+ 
+ /**
+@@ -2909,6 +2913,7 @@ struct ieee80211_iface_combination {
+ 	bool beacon_int_infra_match;
+ 	u8 radar_detect_widths;
+ 	u8 radar_detect_regions;
++    u32 beacon_int_min_gcd;
+ };
+ 
+ struct ieee80211_txrx_stypes {
+@@ -3889,6 +3894,32 @@ const u8 *cfg80211_find_vendor_ie(unsigned int oui, u8 oui_type,
+ int regulatory_hint(struct wiphy *wiphy, const char *alpha2);
+ 
+ /**
++ * regulatory_hint_user - hint to the wireless core a regulatory domain
++ * which the driver has received from an application
++ * @alpha2: the ISO/IEC 3166 alpha2 the driver claims its regulatory domain
++ *  should be in. If @rd is set this should be NULL. Note that if you
++ *  set this to NULL you should still set rd->alpha2 to some accepted
++ *  alpha2.
++ * @user_reg_hint_type: the type of user regulatory hint.
++ *
++ * Wireless drivers can use this function to hint to the wireless core
++ * the current regulatory domain as specified by trusted applications,
++ * it is the driver's responsibilty to estbalish which applications it
++ * trusts.
++ *
++ * The wiphy should be registered to cfg80211 prior to this call.
++ * For cfg80211 drivers this means you must first use wiphy_register(),
++ * for mac80211 drivers you must first use ieee80211_register_hw().
++ *
++ * Drivers should check the return value, its possible you can get
++ * an -ENOMEM or an -EINVAL.
++ *
++ * Return: 0 on success. -ENOMEM, -EINVAL.
++ */
++int regulatory_hint_user(const char *alpha2,
++             enum nl80211_user_reg_hint_type user_reg_hint_type);
++
++/**
+  * regulatory_set_wiphy_regd - set regdom info for self managed drivers
+  * @wiphy: the wireless device we want to process the regulatory domain on
+  * @rd: the regulatory domain informatoin to use for this wiphy
+@@ -5329,6 +5360,17 @@ wiphy_ext_feature_isset(struct wiphy *wiphy,
+ /* ethtool helper */
+ void cfg80211_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info);
+ 
++/**
++ * cfg80211_is_gratuitous_arp_unsolicited_na - packet is grat. ARP/unsol. NA
++ * @skb: the input packet, must be an ethernet frame already
++ *
++ * Return: %true if the packet is a gratuitous ARP or unsolicited NA packet.
++ * This is used to drop packets that shouldn't occur because the AP implements
++ * a proxy service.
++ */
++bool cfg80211_is_gratuitous_arp_unsolicited_na(struct sk_buff *skb);
++
++
+ /* Logging, debugging and troubleshooting/diagnostic helpers. */
+ 
+ /* wiphy_printk helpers, similar to dev_printk */
+diff --git a/include/uapi/linux/nl80211.h b/include/uapi/linux/nl80211.h
+index 1f0b4cf..7fee898 100644
+--- a/include/uapi/linux/nl80211.h
++++ b/include/uapi/linux/nl80211.h
+@@ -3604,6 +3604,8 @@ enum nl80211_band {
+ 	NL80211_BAND_2GHZ,
+ 	NL80211_BAND_5GHZ,
+ 	NL80211_BAND_60GHZ,
++
++    NUM_NL80211_BANDS,
+ };
+ 
+ /**
+diff --git a/net/wireless/reg.c b/net/wireless/reg.c
+index 06d050d..9fbc23a 100644
+--- a/net/wireless/reg.c
++++ b/net/wireless/reg.c
+@@ -2399,6 +2399,7 @@ int regulatory_hint_user(const char *alpha2,
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL(regulatory_hint_user);
+ 
+ int regulatory_hint_indoor(bool is_indoor, u32 portid)
+ {
+diff --git a/net/wireless/util.c b/net/wireless/util.c
+index baf7218..ab6695b 100644
+--- a/net/wireless/util.c
++++ b/net/wireless/util.c
+@@ -1813,3 +1813,54 @@ EXPORT_SYMBOL(rfc1042_header);
+ const unsigned char bridge_tunnel_header[] __aligned(2) =
+ 	{ 0xaa, 0xaa, 0x03, 0x00, 0x00, 0xf8 };
+ EXPORT_SYMBOL(bridge_tunnel_header);
++
++bool cfg80211_is_gratuitous_arp_unsolicited_na(struct sk_buff *skb)
++{
++    const struct ethhdr *eth = (void *)skb->data;
++    const struct {
++        struct arphdr hdr;
++        u8 ar_sha[ETH_ALEN];
++        u8 ar_sip[4];
++        u8 ar_tha[ETH_ALEN];
++        u8 ar_tip[4];
++    } __packed *arp;
++    const struct ipv6hdr *ipv6;
++    const struct icmp6hdr *icmpv6;
++
++    switch (eth->h_proto) {
++    case cpu_to_be16(ETH_P_ARP):
++        /* can't say - but will probably be dropped later anyway */
++        if (!pskb_may_pull(skb, sizeof(*eth) + sizeof(*arp)))
++            return false;
++
++        arp = (void *)(eth + 1);
++
++        if ((arp->hdr.ar_op == cpu_to_be16(ARPOP_REPLY) ||
++             arp->hdr.ar_op == cpu_to_be16(ARPOP_REQUEST)) &&
++            !memcmp(arp->ar_sip, arp->ar_tip, sizeof(arp->ar_sip)))
++            return true;
++        break;
++    case cpu_to_be16(ETH_P_IPV6):
++        /* can't say - but will probably be dropped later anyway */
++        if (!pskb_may_pull(skb, sizeof(*eth) + sizeof(*ipv6) +
++                    sizeof(*icmpv6)))
++            return false;
++
++        ipv6 = (void *)(eth + 1);
++        icmpv6 = (void *)(ipv6 + 1);
++
++        if (icmpv6->icmp6_type == NDISC_NEIGHBOUR_ADVERTISEMENT &&
++            !memcmp(&ipv6->saddr, &ipv6->daddr, sizeof(ipv6->saddr)))
++            return true;
++        break;
++    default:
++        /*
++         * no need to support other protocols, proxy service isn't
++         * specified for any others
++         */
++        break;
++    }
++
++    return false;
++}
++EXPORT_SYMBOL(cfg80211_is_gratuitous_arp_unsolicited_na);
+-- 
+1.9.1
+

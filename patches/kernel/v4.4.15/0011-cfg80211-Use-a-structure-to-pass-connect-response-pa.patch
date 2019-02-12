@@ -1,0 +1,1041 @@
+From d553101eaad272710c2aef5e70d95150afe35550 Mon Sep 17 00:00:00 2001
+From: Vidyullatha Kanchanapally <vkanchan@qti.qualcomm.com>
+Date: Fri, 31 Mar 2017 00:22:33 +0300
+Subject: [PATCH 11/14] cfg80211: Use a structure to pass connect response
+ params
+
+Currently the connect event from driver takes all the connection
+response parameters as arguments. With support for new features these
+response parameters can grow. Use a structure to pass these parameters
+rather than passing them as function arguments.
+
+Signed-off-by: Vidyullatha Kanchanapally <vkanchan@qti.qualcomm.com>
+Signed-off-by: Jouni Malinen <jouni@qca.qualcomm.com>
+[add to documentation]
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ Documentation/driver-api/80211/cfg80211.rst |  354 +++++++++++++++++++++++++++
+ include/linux/ieee80211.h                   |    2 +
+ include/net/cfg80211.h                      |  128 +++++++++-
+ include/uapi/linux/nl80211.h                |   24 ++
+ net/wireless/core.h                         |   17 +-
+ net/wireless/mlme.c                         |   19 +-
+ net/wireless/nl80211.c                      |   29 ++-
+ net/wireless/nl80211.h                      |    7 +-
+ net/wireless/sme.c                          |  153 +++++++-----
+ net/wireless/util.c                         |   12 +-
+ 10 files changed, 633 insertions(+), 112 deletions(-)
+ create mode 100644 Documentation/driver-api/80211/cfg80211.rst
+
+diff --git a/Documentation/driver-api/80211/cfg80211.rst b/Documentation/driver-api/80211/cfg80211.rst
+new file mode 100644
+index 0000000..b101bc0
+--- /dev/null
++++ b/Documentation/driver-api/80211/cfg80211.rst
+@@ -0,0 +1,354 @@
++==================
++cfg80211 subsystem
++==================
++
++Device registration
++===================
++
++.. kernel-doc:: include/net/cfg80211.h
++   :doc: Device registration
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_channel_flags
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_channel
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_rate_flags
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_rate
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_sta_ht_cap
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_supported_band
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_signal_type
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy_params_flags
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy_flags
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wireless_dev
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy_new
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy_read_of_freq_limits
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy_register
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy_unregister
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy_free
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy_name
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy_dev
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy_priv
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: priv_to_wiphy
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: set_wiphy_dev
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wdev_priv
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_iface_limit
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_iface_combination
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_check_combinations
++
++Actions and configuration
++=========================
++
++.. kernel-doc:: include/net/cfg80211.h
++   :doc: Actions and configuration
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_ops
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: vif_params
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: key_params
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: survey_info_flags
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: survey_info
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_beacon_data
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_ap_settings
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: station_parameters
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: rate_info_flags
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: rate_info
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: station_info
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: monitor_flags
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: mpath_info_flags
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: mpath_info
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: bss_parameters
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_txq_params
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_crypto_settings
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_auth_request
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_assoc_request
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_deauth_request
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_disassoc_request
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_ibss_params
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_connect_params
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_pmksa
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_rx_mlme_mgmt
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_auth_timeout
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_rx_assoc_resp
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_assoc_timeout
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_tx_mlme_mgmt
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_ibss_joined
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_connect_resp_params
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_connect_done
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_connect_result
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_connect_bss
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_connect_timeout
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_roamed
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_disconnected
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_ready_on_channel
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_remain_on_channel_expired
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_new_sta
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_rx_mgmt
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_mgmt_tx_status
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_cqm_rssi_notify
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_cqm_pktloss_notify
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_michael_mic_failure
++
++Scanning and BSS list handling
++==============================
++
++.. kernel-doc:: include/net/cfg80211.h
++   :doc: Scanning and BSS list handling
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_ssid
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_scan_request
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_scan_done
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_bss
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_inform_bss
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_inform_bss_frame_data
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_inform_bss_data
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_unlink_bss
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_find_ie
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_bss_get_ie
++
++Utility functions
++=================
++
++.. kernel-doc:: include/net/cfg80211.h
++   :doc: Utility functions
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_channel_to_frequency
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_frequency_to_channel
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_get_channel
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_get_response_rate
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_hdrlen
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_get_hdrlen_from_skb
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_radiotap_iterator
++
++Data path helpers
++=================
++
++.. kernel-doc:: include/net/cfg80211.h
++   :doc: Data path helpers
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_data_to_8023
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_data_from_8023
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: ieee80211_amsdu_to_8023s
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_classify8021d
++
++Regulatory enforcement infrastructure
++=====================================
++
++.. kernel-doc:: include/net/cfg80211.h
++   :doc: Regulatory enforcement infrastructure
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: regulatory_hint
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy_apply_custom_regulatory
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: freq_reg_info
++
++RFkill integration
++==================
++
++.. kernel-doc:: include/net/cfg80211.h
++   :doc: RFkill integration
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy_rfkill_set_hw_state
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy_rfkill_start_polling
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: wiphy_rfkill_stop_polling
++
++Test mode
++=========
++
++.. kernel-doc:: include/net/cfg80211.h
++   :doc: Test mode
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_testmode_alloc_reply_skb
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_testmode_reply
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_testmode_alloc_event_skb
++
++.. kernel-doc:: include/net/cfg80211.h
++   :functions: cfg80211_testmode_event
+diff --git a/include/linux/ieee80211.h b/include/linux/ieee80211.h
+index 573f897..bb20dcc 100644
+--- a/include/linux/ieee80211.h
++++ b/include/linux/ieee80211.h
+@@ -843,6 +843,8 @@ enum ieee80211_vht_opmode_bits {
+ };
+ 
+ #define WLAN_SA_QUERY_TR_ID_LEN 2
++#define WLAN_MEMBERSHIP_LEN 8
++#define WLAN_USER_POSITION_LEN 16
+ 
+ /**
+  * struct ieee80211_tpc_report_ie
+diff --git a/include/net/cfg80211.h b/include/net/cfg80211.h
+index 8246ac0..c008cf6 100644
+--- a/include/net/cfg80211.h
++++ b/include/net/cfg80211.h
+@@ -350,6 +350,9 @@ struct ieee80211_supported_band {
+  * in a separate chapter.
+  */
+ 
++#define VHT_MUMIMO_GROUPS_DATA_LEN (WLAN_MEMBERSHIP_LEN +\
++                                    WLAN_USER_POSITION_LEN)
++
+ /**
+  * struct vif_params - describes virtual interface parameters
+  * @use_4addr: use 4-address frames
+@@ -4693,6 +4696,108 @@ static inline void cfg80211_testmode_event(struct sk_buff *skb, gfp_t gfp)
+ #endif
+ 
+ /**
++ * struct cfg80211_connect_resp_params - Connection response params
++ * @status: Status code, %WLAN_STATUS_SUCCESS for successful connection, use
++ *	%WLAN_STATUS_UNSPECIFIED_FAILURE if your device cannot give you
++ *	the real status code for failures. If this call is used to report a
++ *	failure due to a timeout (e.g., not receiving an Authentication frame
++ *	from the AP) instead of an explicit rejection by the AP, -1 is used to
++ *	indicate that this is a failure, but without a status code.
++ *	@timeout_reason is used to report the reason for the timeout in that
++ *	case.
++ * @bssid: The BSSID of the AP (may be %NULL)
++ * @bss: Entry of bss to which STA got connected to, can be obtained through
++ *	cfg80211_get_bss() (may be %NULL). Only one parameter among @bssid and
++ *	@bss needs to be specified.
++ * @req_ie: Association request IEs (may be %NULL)
++ * @req_ie_len: Association request IEs length
++ * @resp_ie: Association response IEs (may be %NULL)
++ * @resp_ie_len: Association response IEs length
++ * @timeout_reason: Reason for connection timeout. This is used when the
++ *	connection fails due to a timeout instead of an explicit rejection from
++ *	the AP. %NL80211_TIMEOUT_UNSPECIFIED is used when the timeout reason is
++ *	not known. This value is used only if @status < 0 to indicate that the
++ *	failure is due to a timeout and not due to explicit rejection by the AP.
++ *	This value is ignored in other cases (@status >= 0).
++ */
++struct cfg80211_connect_resp_params {
++	int status;
++	const u8 *bssid;
++	struct cfg80211_bss *bss;
++	const u8 *req_ie;
++	size_t req_ie_len;
++	const u8 *resp_ie;
++	size_t resp_ie_len;
++	enum nl80211_timeout_reason timeout_reason;
++};
++
++/**
++ * cfg80211_connect_done - notify cfg80211 of connection result
++ *
++ * @dev: network device
++ * @params: connection response parameters
++ * @gfp: allocation flags
++ *
++ * It should be called by the underlying driver once execution of the connection
++ * request from connect() has been completed. This is similar to
++ * cfg80211_connect_bss(), but takes a structure pointer for connection response
++ * parameters. Only one of the functions among cfg80211_connect_bss(),
++ * cfg80211_connect_result(), cfg80211_connect_timeout(),
++ * and cfg80211_connect_done() should be called.
++ */
++void cfg80211_connect_done(struct net_device *dev,
++			   struct cfg80211_connect_resp_params *params,
++			   gfp_t gfp);
++
++/**
++ * cfg80211_connect_bss - notify cfg80211 of connection result
++ *
++ * @dev: network device
++ * @bssid: the BSSID of the AP
++ * @bss: entry of bss to which STA got connected to, can be obtained
++ *	through cfg80211_get_bss (may be %NULL)
++ * @req_ie: association request IEs (maybe be %NULL)
++ * @req_ie_len: association request IEs length
++ * @resp_ie: association response IEs (may be %NULL)
++ * @resp_ie_len: assoc response IEs length
++ * @status: status code, %WLAN_STATUS_SUCCESS for successful connection, use
++ *	%WLAN_STATUS_UNSPECIFIED_FAILURE if your device cannot give you
++ *	the real status code for failures. If this call is used to report a
++ *	failure due to a timeout (e.g., not receiving an Authentication frame
++ *	from the AP) instead of an explicit rejection by the AP, -1 is used to
++ *	indicate that this is a failure, but without a status code.
++ *	@timeout_reason is used to report the reason for the timeout in that
++ *	case.
++ * @gfp: allocation flags
++ *
++ * It should be called by the underlying driver once execution of the connection
++ * request from connect() has been completed. This is similar to
++ * cfg80211_connect_result(), but with the option of identifying the exact bss
++ * entry for the connection. Only one of the functions among
++ * cfg80211_connect_bss(), cfg80211_connect_result(),
++ * cfg80211_connect_timeout(), and cfg80211_connect_done() should be called.
++ */
++static inline void
++cfg80211_connect_bss(struct net_device *dev, const u8 *bssid,
++		     struct cfg80211_bss *bss, const u8 *req_ie,
++		     size_t req_ie_len, const u8 *resp_ie,
++		     size_t resp_ie_len, int status, gfp_t gfp)
++{
++	struct cfg80211_connect_resp_params params;
++
++	memset(&params, 0, sizeof(params));
++	params.status = status;
++	params.bssid = bssid;
++	params.bss = bss;
++	params.req_ie = req_ie;
++	params.req_ie_len = req_ie_len;
++	params.resp_ie = resp_ie;
++	params.resp_ie_len = resp_ie_len;
++
++	cfg80211_connect_done(dev, &params, gfp);
++}
++
++/**
+  * cfg80211_connect_result - notify cfg80211 of connection result
+  *
+  * @dev: network device
+@@ -4706,13 +4811,22 @@ static inline void cfg80211_testmode_event(struct sk_buff *skb, gfp_t gfp)
+  *	the real status code for failures.
+  * @gfp: allocation flags
+  *
+- * It should be called by the underlying driver whenever connect() has
+- * succeeded.
+- */
+-void cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+-			     const u8 *req_ie, size_t req_ie_len,
+-			     const u8 *resp_ie, size_t resp_ie_len,
+-			     u16 status, gfp_t gfp);
++ * It should be called by the underlying driver once execution of the connection
++ * request from connect() has been completed. This is similar to
++ * cfg80211_connect_bss() which allows the exact bss entry to be specified. Only
++ * one of the functions among cfg80211_connect_bss(), cfg80211_connect_result(),
++ * cfg80211_connect_timeout(), and cfg80211_connect_done() should be called.
++ */
++static inline void
++cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
++			const u8 *req_ie, size_t req_ie_len,
++			const u8 *resp_ie, size_t resp_ie_len,
++			u16 status, gfp_t gfp)
++{
++	cfg80211_connect_bss(dev, bssid, NULL, req_ie, req_ie_len, resp_ie,
++			     resp_ie_len, status, gfp);
++}
++
+ 
+ /**
+  * cfg80211_roamed - notify cfg80211 of roaming
+diff --git a/include/uapi/linux/nl80211.h b/include/uapi/linux/nl80211.h
+index 275235e..12c779b 100644
+--- a/include/uapi/linux/nl80211.h
++++ b/include/uapi/linux/nl80211.h
+@@ -2271,6 +2271,15 @@ enum nl80211_attrs {
+ 	NL80211_ATTR_FILS_KEK,
+ 	NL80211_ATTR_FILS_NONCES,
+ 
++        NL80211_ATTR_MULTICAST_TO_UNICAST_ENABLED,
++
++        NL80211_ATTR_BSSID,
++
++        NL80211_ATTR_SCHED_SCAN_RELATIVE_RSSI,
++        NL80211_ATTR_SCHED_SCAN_RSSI_ADJUST,
++
++        NL80211_ATTR_TIMEOUT_REASON,
++
+ 	/* add attributes here, update the policy in nl80211.c */
+ 
+ 	__NL80211_ATTR_AFTER_LAST,
+@@ -4595,6 +4604,21 @@ enum nl80211_connect_failed_reason {
+ };
+ 
+ /**
++ * enum nl80211_timeout_reason - timeout reasons
++ *
++ * @NL80211_TIMEOUT_UNSPECIFIED: Timeout reason unspecified.
++ * @NL80211_TIMEOUT_SCAN: Scan (AP discovery) timed out.
++ * @NL80211_TIMEOUT_AUTH: Authentication timed out.
++ * @NL80211_TIMEOUT_ASSOC: Association timed out.
++ */
++enum nl80211_timeout_reason {
++        NL80211_TIMEOUT_UNSPECIFIED,
++        NL80211_TIMEOUT_SCAN,
++        NL80211_TIMEOUT_AUTH,
++        NL80211_TIMEOUT_ASSOC,
++};
++
++/**
+  * enum nl80211_scan_flags -  scan request control flags
+  *
+  * Scan request control flags are used to control the handling
+diff --git a/net/wireless/core.h b/net/wireless/core.h
+index ab4bca2..6987970 100644
+--- a/net/wireless/core.h
++++ b/net/wireless/core.h
+@@ -208,14 +208,7 @@ struct cfg80211_event {
+ 	enum cfg80211_event_type type;
+ 
+ 	union {
+-		struct {
+-			u8 bssid[ETH_ALEN];
+-			const u8 *req_ie;
+-			const u8 *resp_ie;
+-			size_t req_ie_len;
+-			size_t resp_ie_len;
+-			u16 status;
+-		} cr;
++		struct cfg80211_connect_resp_params cr;
+ 		struct {
+ 			const u8 *req_ie;
+ 			const u8 *resp_ie;
+@@ -371,11 +364,9 @@ int cfg80211_connect(struct cfg80211_registered_device *rdev,
+ 		     struct cfg80211_connect_params *connect,
+ 		     struct cfg80211_cached_keys *connkeys,
+ 		     const u8 *prev_bssid);
+-void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+-			       const u8 *req_ie, size_t req_ie_len,
+-			       const u8 *resp_ie, size_t resp_ie_len,
+-			       u16 status, bool wextev,
+-			       struct cfg80211_bss *bss);
++void __cfg80211_connect_result(struct net_device *dev,
++			       struct cfg80211_connect_resp_params *params,
++			       bool wextev);
+ void __cfg80211_disconnected(struct net_device *dev, const u8 *ie,
+ 			     size_t ie_len, u16 reason, bool from_ap);
+ int cfg80211_disconnect(struct cfg80211_registered_device *rdev,
+diff --git a/net/wireless/mlme.c b/net/wireless/mlme.c
+index 17c125d..0fd7c19 100644
+--- a/net/wireless/mlme.c
++++ b/net/wireless/mlme.c
+@@ -26,9 +26,16 @@ void cfg80211_rx_assoc_resp(struct net_device *dev, struct cfg80211_bss *bss,
+ 	struct wiphy *wiphy = wdev->wiphy;
+ 	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wiphy);
+ 	struct ieee80211_mgmt *mgmt = (struct ieee80211_mgmt *)buf;
+-	u8 *ie = mgmt->u.assoc_resp.variable;
+-	int ieoffs = offsetof(struct ieee80211_mgmt, u.assoc_resp.variable);
+-	u16 status_code = le16_to_cpu(mgmt->u.assoc_resp.status_code);
++	struct cfg80211_connect_resp_params cr;
++
++	memset(&cr, 0, sizeof(cr));
++	cr.status = (int)le16_to_cpu(mgmt->u.assoc_resp.status_code);
++	cr.bssid = mgmt->bssid;
++	cr.bss = bss;
++	cr.resp_ie = mgmt->u.assoc_resp.variable;
++	cr.resp_ie_len =
++		len - offsetof(struct ieee80211_mgmt, u.assoc_resp.variable);
++	cr.timeout_reason = NL80211_TIMEOUT_UNSPECIFIED;
+ 
+ 	trace_cfg80211_send_rx_assoc(dev, bss);
+ 
+@@ -38,7 +45,7 @@ void cfg80211_rx_assoc_resp(struct net_device *dev, struct cfg80211_bss *bss,
+ 	 * and got a reject -- we only try again with an assoc
+ 	 * frame instead of reassoc.
+ 	 */
+-	if (cfg80211_sme_rx_assoc_resp(wdev, status_code)) {
++	if (cfg80211_sme_rx_assoc_resp(wdev, cr.status)) {
+ 		cfg80211_unhold_bss(bss_from_pub(bss));
+ 		cfg80211_put_bss(wiphy, bss);
+ 		return;
+@@ -46,9 +53,7 @@ void cfg80211_rx_assoc_resp(struct net_device *dev, struct cfg80211_bss *bss,
+ 
+ 	nl80211_send_rx_assoc(rdev, dev, buf, len, GFP_KERNEL, uapsd_queues);
+ 	/* update current_bss etc., consumes the bss reference */
+-	__cfg80211_connect_result(dev, mgmt->bssid, NULL, 0, ie, len - ieoffs,
+-				  status_code,
+-				  status_code == WLAN_STATUS_SUCCESS, bss);
++	__cfg80211_connect_result(dev, &cr, cr.status == WLAN_STATUS_SUCCESS);
+ }
+ EXPORT_SYMBOL(cfg80211_rx_assoc_resp);
+ 
+diff --git a/net/wireless/nl80211.c b/net/wireless/nl80211.c
+index 5d055ed..8025928 100644
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -11899,15 +11899,14 @@ void nl80211_send_assoc_timeout(struct cfg80211_registered_device *rdev,
+ }
+ 
+ void nl80211_send_connect_result(struct cfg80211_registered_device *rdev,
+-				 struct net_device *netdev, const u8 *bssid,
+-				 const u8 *req_ie, size_t req_ie_len,
+-				 const u8 *resp_ie, size_t resp_ie_len,
+-				 u16 status, gfp_t gfp)
++				 struct net_device *netdev,
++				 struct cfg80211_connect_resp_params *cr,
++				 gfp_t gfp)
+ {
+ 	struct sk_buff *msg;
+ 	void *hdr;
+ 
+-	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, gfp);
++	msg = nlmsg_new(100 + cr->req_ie_len + cr->resp_ie_len, gfp);
+ 	if (!msg)
+ 		return;
+ 
+@@ -11919,12 +11918,20 @@ void nl80211_send_connect_result(struct cfg80211_registered_device *rdev,
+ 
+ 	if (nla_put_u32(msg, NL80211_ATTR_WIPHY, rdev->wiphy_idx) ||
+ 	    nla_put_u32(msg, NL80211_ATTR_IFINDEX, netdev->ifindex) ||
+-	    (bssid && nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, bssid)) ||
+-	    nla_put_u16(msg, NL80211_ATTR_STATUS_CODE, status) ||
+-	    (req_ie &&
+-	     nla_put(msg, NL80211_ATTR_REQ_IE, req_ie_len, req_ie)) ||
+-	    (resp_ie &&
+-	     nla_put(msg, NL80211_ATTR_RESP_IE, resp_ie_len, resp_ie)))
++	    (cr->bssid &&
++	     nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, cr->bssid)) ||
++	    nla_put_u16(msg, NL80211_ATTR_STATUS_CODE,
++			cr->status < 0 ? WLAN_STATUS_UNSPECIFIED_FAILURE :
++			cr->status) ||
++	    (cr->status < 0 &&
++	     (nla_put_flag(msg, NL80211_ATTR_TIMED_OUT) ||
++	      nla_put_u32(msg, NL80211_ATTR_TIMEOUT_REASON,
++			  cr->timeout_reason))) ||
++	    (cr->req_ie &&
++	     nla_put(msg, NL80211_ATTR_REQ_IE, cr->req_ie_len, cr->req_ie)) ||
++	    (cr->resp_ie &&
++	     nla_put(msg, NL80211_ATTR_RESP_IE, cr->resp_ie_len,
++		     cr->resp_ie)))
+ 		goto nla_put_failure;
+ 
+ 	genlmsg_end(msg, hdr);
+diff --git a/net/wireless/nl80211.h b/net/wireless/nl80211.h
+index 84d4edf..79e9270 100644
+--- a/net/wireless/nl80211.h
++++ b/net/wireless/nl80211.h
+@@ -52,10 +52,9 @@ void nl80211_send_assoc_timeout(struct cfg80211_registered_device *rdev,
+ 				struct net_device *netdev,
+ 				const u8 *addr, gfp_t gfp);
+ void nl80211_send_connect_result(struct cfg80211_registered_device *rdev,
+-				 struct net_device *netdev, const u8 *bssid,
+-				 const u8 *req_ie, size_t req_ie_len,
+-				 const u8 *resp_ie, size_t resp_ie_len,
+-				 u16 status, gfp_t gfp);
++				 struct net_device *netdev,
++				 struct cfg80211_connect_resp_params *params,
++				 gfp_t gfp);
+ void nl80211_send_roamed(struct cfg80211_registered_device *rdev,
+ 			 struct net_device *netdev, const u8 *bssid,
+ 			 const u8 *req_ie, size_t req_ie_len,
+diff --git a/net/wireless/sme.c b/net/wireless/sme.c
+index 8020b5b..b99fdce 100644
+--- a/net/wireless/sme.c
++++ b/net/wireless/sme.c
+@@ -218,6 +218,7 @@ void cfg80211_conn_work(struct work_struct *work)
+ 		container_of(work, struct cfg80211_registered_device, conn_work);
+ 	struct wireless_dev *wdev;
+ 	u8 bssid_buf[ETH_ALEN], *bssid = NULL;
++	enum nl80211_timeout_reason treason;
+ 
+ 	rtnl_lock();
+ 
+@@ -239,12 +240,15 @@ void cfg80211_conn_work(struct work_struct *work)
+ 			memcpy(bssid_buf, wdev->conn->params.bssid, ETH_ALEN);
+ 			bssid = bssid_buf;
+ 		}
++		treason = NL80211_TIMEOUT_UNSPECIFIED;
+ 		if (cfg80211_conn_do_work(wdev)) {
+-			__cfg80211_connect_result(
+-					wdev->netdev, bssid,
+-					NULL, 0, NULL, 0,
+-					WLAN_STATUS_UNSPECIFIED_FAILURE,
+-					false, NULL);
++			struct cfg80211_connect_resp_params cr;
++
++			memset(&cr, 0, sizeof(cr));
++			cr.status = -1;
++			cr.bssid = bssid;
++			cr.timeout_reason = treason;
++			__cfg80211_connect_result(wdev->netdev, &cr, false);
+ 		}
+ 		wdev_unlock(wdev);
+ 	}
+@@ -347,9 +351,13 @@ void cfg80211_sme_rx_auth(struct wireless_dev *wdev, const u8 *buf, size_t len)
+ 		wdev->conn->state = CFG80211_CONN_AUTHENTICATE_NEXT;
+ 		schedule_work(&rdev->conn_work);
+ 	} else if (status_code != WLAN_STATUS_SUCCESS) {
+-		__cfg80211_connect_result(wdev->netdev, mgmt->bssid,
+-					  NULL, 0, NULL, 0,
+-					  status_code, false, NULL);
++		struct cfg80211_connect_resp_params cr;
++
++		memset(&cr, 0, sizeof(cr));
++		cr.status = status_code;
++		cr.bssid = mgmt->bssid;
++		cr.timeout_reason = NL80211_TIMEOUT_UNSPECIFIED;
++		__cfg80211_connect_result(wdev->netdev, &cr, false);
+ 	} else if (wdev->conn->state == CFG80211_CONN_AUTHENTICATING) {
+ 		wdev->conn->state = CFG80211_CONN_ASSOCIATE_NEXT;
+ 		schedule_work(&rdev->conn_work);
+@@ -633,11 +641,9 @@ static DECLARE_WORK(cfg80211_disconnect_work, disconnect_work);
+  */
+ 
+ /* This method must consume bss one way or another */
+-void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+-			       const u8 *req_ie, size_t req_ie_len,
+-			       const u8 *resp_ie, size_t resp_ie_len,
+-			       u16 status, bool wextev,
+-			       struct cfg80211_bss *bss)
++void __cfg80211_connect_result(struct net_device *dev,
++			       struct cfg80211_connect_resp_params *cr,
++			       bool wextev)
+ {
+ 	struct wireless_dev *wdev = dev->ieee80211_ptr;
+ 	const u8 *country_ie;
+@@ -649,48 +655,48 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+ 
+ 	if (WARN_ON(wdev->iftype != NL80211_IFTYPE_STATION &&
+ 		    wdev->iftype != NL80211_IFTYPE_P2P_CLIENT)) {
+-		cfg80211_put_bss(wdev->wiphy, bss);
++		cfg80211_put_bss(wdev->wiphy, cr->bss);
+ 		return;
+ 	}
+ 
+-	nl80211_send_connect_result(wiphy_to_rdev(wdev->wiphy), dev,
+-				    bssid, req_ie, req_ie_len,
+-				    resp_ie, resp_ie_len,
+-				    status, GFP_KERNEL);
++	nl80211_send_connect_result(wiphy_to_rdev(wdev->wiphy), dev, cr,
++				    GFP_KERNEL);
+ 
+ #ifdef CONFIG_CFG80211_WEXT
+ 	if (wextev) {
+-		if (req_ie && status == WLAN_STATUS_SUCCESS) {
++		if (cr->req_ie && cr->status == WLAN_STATUS_SUCCESS) {
+ 			memset(&wrqu, 0, sizeof(wrqu));
+-			wrqu.data.length = req_ie_len;
+-			wireless_send_event(dev, IWEVASSOCREQIE, &wrqu, req_ie);
++			wrqu.data.length = cr->req_ie_len;
++			wireless_send_event(dev, IWEVASSOCREQIE, &wrqu,
++					    cr->req_ie);
+ 		}
+ 
+-		if (resp_ie && status == WLAN_STATUS_SUCCESS) {
++		if (cr->resp_ie && cr->status == WLAN_STATUS_SUCCESS) {
+ 			memset(&wrqu, 0, sizeof(wrqu));
+-			wrqu.data.length = resp_ie_len;
+-			wireless_send_event(dev, IWEVASSOCRESPIE, &wrqu, resp_ie);
++			wrqu.data.length = cr->resp_ie_len;
++			wireless_send_event(dev, IWEVASSOCRESPIE, &wrqu,
++					    cr->resp_ie);
+ 		}
+ 
+ 		memset(&wrqu, 0, sizeof(wrqu));
+ 		wrqu.ap_addr.sa_family = ARPHRD_ETHER;
+-		if (bssid && status == WLAN_STATUS_SUCCESS) {
+-			memcpy(wrqu.ap_addr.sa_data, bssid, ETH_ALEN);
+-			memcpy(wdev->wext.prev_bssid, bssid, ETH_ALEN);
++		if (cr->bssid && cr->status == WLAN_STATUS_SUCCESS) {
++			memcpy(wrqu.ap_addr.sa_data, cr->bssid, ETH_ALEN);
++			memcpy(wdev->wext.prev_bssid, cr->bssid, ETH_ALEN);
+ 			wdev->wext.prev_bssid_valid = true;
+ 		}
+ 		wireless_send_event(dev, SIOCGIWAP, &wrqu, NULL);
+ 	}
+ #endif
+ 
+-	if (!bss && (status == WLAN_STATUS_SUCCESS)) {
++	if (!cr->bss && (cr->status == WLAN_STATUS_SUCCESS)) {
+ 		WARN_ON_ONCE(!wiphy_to_rdev(wdev->wiphy)->ops->connect);
+-		bss = cfg80211_get_bss(wdev->wiphy, NULL, bssid,
+-				       wdev->ssid, wdev->ssid_len,
+-				       IEEE80211_BSS_TYPE_ESS,
+-				       IEEE80211_PRIVACY_ANY);
+-		if (bss)
+-			cfg80211_hold_bss(bss_from_pub(bss));
++		cr->bss = cfg80211_get_bss(wdev->wiphy, NULL, cr->bssid,
++					   wdev->ssid, wdev->ssid_len,
++					   IEEE80211_BSS_TYPE_ESS,
++					   IEEE80211_PRIVACY_ANY);
++		if (cr->bss)
++			cfg80211_hold_bss(bss_from_pub(cr->bss));
+ 	}
+ 
+ 	if (wdev->current_bss) {
+@@ -699,27 +705,27 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+ 		wdev->current_bss = NULL;
+ 	}
+ 
+-	if (status != WLAN_STATUS_SUCCESS) {
++	if (cr->status != WLAN_STATUS_SUCCESS) {
+ 		kzfree(wdev->connect_keys);
+ 		wdev->connect_keys = NULL;
+ 		wdev->ssid_len = 0;
+-		if (bss) {
+-			cfg80211_unhold_bss(bss_from_pub(bss));
+-			cfg80211_put_bss(wdev->wiphy, bss);
++		if (cr->bss) {
++			cfg80211_unhold_bss(bss_from_pub(cr->bss));
++			cfg80211_put_bss(wdev->wiphy, cr->bss);
+ 		}
+ 		cfg80211_sme_free(wdev);
+ 		return;
+ 	}
+ 
+-	if (WARN_ON(!bss))
++	if (WARN_ON(!cr->bss))
+ 		return;
+ 
+-	wdev->current_bss = bss_from_pub(bss);
++	wdev->current_bss = bss_from_pub(cr->bss);
+ 
+ 	cfg80211_upload_connect_keys(wdev);
+ 
+ 	rcu_read_lock();
+-	country_ie = ieee80211_bss_get_ie(bss, WLAN_EID_COUNTRY);
++	country_ie = ieee80211_bss_get_ie(cr->bss, WLAN_EID_COUNTRY);
+ 	if (!country_ie) {
+ 		rcu_read_unlock();
+ 		return;
+@@ -736,46 +742,71 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+ 	 * - country_ie + 2, the start of the country ie data, and
+ 	 * - and country_ie[1] which is the IE length
+ 	 */
+-	regulatory_hint_country_ie(wdev->wiphy, bss->channel->band,
++	regulatory_hint_country_ie(wdev->wiphy, cr->bss->channel->band,
+ 				   country_ie + 2, country_ie[1]);
+ 	kfree(country_ie);
+ }
+ 
+-void cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
+-			     const u8 *req_ie, size_t req_ie_len,
+-			     const u8 *resp_ie, size_t resp_ie_len,
+-			     u16 status, gfp_t gfp)
++/* Consumes bss object one way or another */
++void cfg80211_connect_done(struct net_device *dev,
++			   struct cfg80211_connect_resp_params *params,
++			   gfp_t gfp)
+ {
+ 	struct wireless_dev *wdev = dev->ieee80211_ptr;
+ 	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wdev->wiphy);
+ 	struct cfg80211_event *ev;
+ 	unsigned long flags;
++	u8 *next;
+ 
+-	ev = kzalloc(sizeof(*ev) + req_ie_len + resp_ie_len, gfp);
+-	if (!ev)
+-		return;
++	if (params->bss) {
++		/* Make sure the bss entry provided by the driver is valid. */
++		struct cfg80211_internal_bss *ibss = bss_from_pub(params->bss);
++
++		if (WARN_ON(list_empty(&ibss->list))) {
++			cfg80211_put_bss(wdev->wiphy, params->bss);
++			return;
++		}
++	}
+ 
++	ev = kzalloc(sizeof(*ev) + (params->bssid ? ETH_ALEN : 0) +
++		     params->req_ie_len + params->resp_ie_len, gfp);
++	if (!ev) {
++		cfg80211_put_bss(wdev->wiphy, params->bss);
++		return;
++	}
+ 	ev->type = EVENT_CONNECT_RESULT;
+-	if (bssid)
+-		memcpy(ev->cr.bssid, bssid, ETH_ALEN);
+-	if (req_ie_len) {
+-		ev->cr.req_ie = ((u8 *)ev) + sizeof(*ev);
+-		ev->cr.req_ie_len = req_ie_len;
+-		memcpy((void *)ev->cr.req_ie, req_ie, req_ie_len);
++	next = ((u8 *)ev) + sizeof(*ev);
++	if (params->bssid) {
++		ev->cr.bssid = next;
++		memcpy((void *)ev->cr.bssid, params->bssid, ETH_ALEN);
++		next += ETH_ALEN;
++	}
++	if (params->req_ie_len) {
++		ev->cr.req_ie = next;
++		ev->cr.req_ie_len = params->req_ie_len;
++		memcpy((void *)ev->cr.req_ie, params->req_ie,
++		       params->req_ie_len);
++		next += params->req_ie_len;
+ 	}
+-	if (resp_ie_len) {
+-		ev->cr.resp_ie = ((u8 *)ev) + sizeof(*ev) + req_ie_len;
+-		ev->cr.resp_ie_len = resp_ie_len;
+-		memcpy((void *)ev->cr.resp_ie, resp_ie, resp_ie_len);
++	if (params->resp_ie_len) {
++		ev->cr.resp_ie = next;
++		ev->cr.resp_ie_len = params->resp_ie_len;
++		memcpy((void *)ev->cr.resp_ie, params->resp_ie,
++		       params->resp_ie_len);
++		next += params->resp_ie_len;
+ 	}
+-	ev->cr.status = status;
++	if (params->bss)
++		cfg80211_hold_bss(bss_from_pub(params->bss));
++	ev->cr.bss = params->bss;
++	ev->cr.status = params->status;
++	ev->cr.timeout_reason = params->timeout_reason;
+ 
+ 	spin_lock_irqsave(&wdev->event_lock, flags);
+ 	list_add_tail(&ev->list, &wdev->event_list);
+ 	spin_unlock_irqrestore(&wdev->event_lock, flags);
+ 	queue_work(cfg80211_wq, &rdev->event_work);
+ }
+-EXPORT_SYMBOL(cfg80211_connect_result);
++EXPORT_SYMBOL(cfg80211_connect_done);
+ 
+ /* Consumes bss object one way or another */
+ void __cfg80211_roamed(struct wireless_dev *wdev,
+diff --git a/net/wireless/util.c b/net/wireless/util.c
+index ab6695b..5a867f9 100644
+--- a/net/wireless/util.c
++++ b/net/wireless/util.c
+@@ -857,7 +857,6 @@ void cfg80211_process_wdev_events(struct wireless_dev *wdev)
+ {
+ 	struct cfg80211_event *ev;
+ 	unsigned long flags;
+-	const u8 *bssid = NULL;
+ 
+ 	spin_lock_irqsave(&wdev->event_lock, flags);
+ 	while (!list_empty(&wdev->event_list)) {
+@@ -869,15 +868,10 @@ void cfg80211_process_wdev_events(struct wireless_dev *wdev)
+ 		wdev_lock(wdev);
+ 		switch (ev->type) {
+ 		case EVENT_CONNECT_RESULT:
+-			if (!is_zero_ether_addr(ev->cr.bssid))
+-				bssid = ev->cr.bssid;
+ 			__cfg80211_connect_result(
+-				wdev->netdev, bssid,
+-				ev->cr.req_ie, ev->cr.req_ie_len,
+-				ev->cr.resp_ie, ev->cr.resp_ie_len,
+-				ev->cr.status,
+-				ev->cr.status == WLAN_STATUS_SUCCESS,
+-				NULL);
++				wdev->netdev,
++				&ev->cr,
++				ev->cr.status == WLAN_STATUS_SUCCESS);
+ 			break;
+ 		case EVENT_ROAMED:
+ 			__cfg80211_roamed(wdev, ev->rm.bss, ev->rm.req_ie,
+-- 
+1.7.9.5
+

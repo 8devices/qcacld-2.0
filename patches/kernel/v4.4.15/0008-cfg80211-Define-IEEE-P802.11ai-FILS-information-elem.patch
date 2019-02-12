@@ -1,0 +1,84 @@
+From 7b2f87e1c605b580614c6388682aec55da5728a5 Mon Sep 17 00:00:00 2001
+From: Jouni Malinen <jouni@qca.qualcomm.com>
+Date: Thu, 27 Oct 2016 00:42:01 +0300
+Subject: [PATCH 08/14] cfg80211: Define IEEE P802.11ai (FILS) information
+ elements
+
+Define the Element IDs and Element ID Extensions from IEEE
+P802.11ai/D11.0. In addition, add a new cfg80211_find_ext_ie() wrapper
+to make it easier to find information elements that used the Element ID
+Extension field.
+
+Signed-off-by: Jouni Malinen <jouni@qca.qualcomm.com>
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ include/linux/ieee80211.h |   20 ++++++++++++++++++++
+ include/net/cfg80211.h    |   21 +++++++++++++++++++++
+ 2 files changed, 41 insertions(+)
+
+diff --git a/include/linux/ieee80211.h b/include/linux/ieee80211.h
+index 452c0b0..f5fb6bb 100644
+--- a/include/linux/ieee80211.h
++++ b/include/linux/ieee80211.h
+@@ -1919,6 +1919,26 @@ enum ieee80211_eid {
+ 
+ 	WLAN_EID_VENDOR_SPECIFIC = 221,
+ 	WLAN_EID_QOS_PARAMETER = 222,
++	WLAN_EID_CAG_NUMBER = 237,
++	WLAN_EID_AP_CSN = 239,
++	WLAN_EID_FILS_INDICATION = 240,
++	WLAN_EID_DILS = 241,
++	WLAN_EID_FRAGMENT = 242,
++	WLAN_EID_EXTENSION = 255
++};
++
++/* Element ID Extensions for Element ID 255 */
++enum ieee80211_eid_ext {
++	WLAN_EID_EXT_ASSOC_DELAY_INFO = 1,
++	WLAN_EID_EXT_FILS_REQ_PARAMS = 2,
++	WLAN_EID_EXT_FILS_KEY_CONFIRM = 3,
++	WLAN_EID_EXT_FILS_SESSION = 4,
++	WLAN_EID_EXT_FILS_HLP_CONTAINER = 5,
++	WLAN_EID_EXT_FILS_IP_ADDR_ASSIGN = 6,
++	WLAN_EID_EXT_KEY_DELIVERY = 7,
++	WLAN_EID_EXT_FILS_WRAPPED_DATA = 8,
++	WLAN_EID_EXT_FILS_PUBLIC_KEY = 12,
++	WLAN_EID_EXT_FILS_NONCE = 13,
+ };
+ 
+ /* Action category code */
+diff --git a/include/net/cfg80211.h b/include/net/cfg80211.h
+index ab3e2cd..4ee9a62 100644
+--- a/include/net/cfg80211.h
++++ b/include/net/cfg80211.h
+@@ -3875,6 +3875,27 @@ static inline const u8 *cfg80211_find_ie(u8 eid, const u8 *ies, int len)
+ }
+ 
+ /**
++ * cfg80211_find_ext_ie - find information element with EID Extension in data
++ *
++ * @ext_eid: element ID Extension
++ * @ies: data consisting of IEs
++ * @len: length of data
++ *
++ * Return: %NULL if the extended element ID could not be found or if
++ * the element is invalid (claims to be longer than the given
++ * data), or a pointer to the first byte of the requested
++ * element, that is the byte containing the element ID.
++ *
++ * Note: There are no checks on the element length other than
++ * having to fit into the given data.
++ */
++static inline const u8 *cfg80211_find_ext_ie(u8 ext_eid, const u8 *ies, int len)
++{
++	return cfg80211_find_ie_match(WLAN_EID_EXTENSION, ies, len,
++				      &ext_eid, 1, 2);
++}
++
++/**
+  * cfg80211_find_vendor_ie - find vendor specific information element in data
+  *
+  * @oui: vendor OUI
+-- 
+1.7.9.5
+

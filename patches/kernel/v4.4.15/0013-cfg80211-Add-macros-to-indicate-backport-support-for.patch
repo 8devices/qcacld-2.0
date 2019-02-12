@@ -1,0 +1,36 @@
+From b936a5a603319ccb2f76440bc8ddaa33e43a0e0c Mon Sep 17 00:00:00 2001
+From: Nakul Kachhwaha <nkachh@codeaurora.org>
+Date: Mon, 24 Jul 2017 12:20:25 +0530
+Subject: [PATCH 13/14] cfg80211: Add macros to indicate backport support for
+ FILS
+
+This change adds two macros, one to indicate backport support for the
+new connect done event which takes connection response parameters as a
+structure instead of function arguments and the other macro is to
+indicate backport support for FILS shared key authentication offload to
+driver.
+
+---
+ include/net/cfg80211.h |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/include/net/cfg80211.h b/include/net/cfg80211.h
+index 7bfaba4..0d5c751 100644
+--- a/include/net/cfg80211.h
++++ b/include/net/cfg80211.h
+@@ -24,6 +24,12 @@
+ #include <linux/net.h>
+ #include <net/regulatory.h>
+ 
++/* Indicate backport support for the new connect done api */
++#define CFG80211_CONNECT_DONE 1
++#define CFG80211_CONNECT_BSS 1
++/* Indicate backport support for FILS SK offload in cfg80211 */
++#define CFG80211_FILS_SK_OFFLOAD_SUPPORT 1
++
+ /**
+  * DOC: Introduction
+  *
+-- 
+1.7.9.5
+
