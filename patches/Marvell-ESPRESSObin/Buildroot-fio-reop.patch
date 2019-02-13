@@ -1,0 +1,12 @@
+diff --git a/package/fio/fio.mk b/package/fio/fio.mk
+index e310d61..39a4d56 100644
+--- a/package/fio/fio.mk
++++ b/package/fio/fio.mk
+@@ -5,7 +5,7 @@
+ ################################################################################
+
+ FIO_VERSION = 2.17
+-FIO_SITE = https://fossies.org/linux/misc
++FIO_SITE = https://github.com/axboe/fio/archive
+ FIO_LICENSE = GPLv2 + special obligations
+ FIO_LICENSE_FILES = LICENSE

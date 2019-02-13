@@ -1,0 +1,22 @@
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-community.dts b/arch/arm64/boot/dts/marvell/armada-3720-community.dts
+index bad9a5e1a52f..89f7ccbd1da5 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-community.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-community.dts
+@@ -148,7 +149,7 @@
+ 				wp-inverted;
+ 				bus-width = <4>;
+ 				cd-gpios = <&gpio_nb 3 GPIO_ACTIVE_LOW>;
+-				no-1-8-v;
++				/*no-1-8-v;*/
+ 				vqmmc-supply = <&vcc_sd_reg1>;
+ 				marvell,pad-type = "sd";
+ 				status = "okay";
+@@ -172,7 +173,7 @@
+ 				gpios = <&gpio_nb 4 GPIO_ACTIVE_HIGH>;
+ 				gpios-states = <0>;
+ 				states = <1800000 0x1
+-					  3300000 0x0>;
++					  3300000 0x1>;
+ 
+ 				enable-active-high;
+ 			};
