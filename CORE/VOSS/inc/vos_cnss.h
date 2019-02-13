@@ -38,6 +38,7 @@
 #include <linux/jiffies.h>
 #include <linux/workqueue.h>
 #include <linux/sched.h>
+#include <linux/pci.h>
 
 enum cnss_bus_width_type {
 	CNSS_BUS_WIDTH_NONE,
