@@ -1,3 +1,9 @@
+# Uncomment and edits this if you want to change parameters
+#
+# ARCH =
+# KERNEL_SRC =
+# CROSS_COMPILE =
+
 KERNEL_SRC ?= /lib/modules/$(shell uname -r)/build
 
 KBUILD_OPTIONS := WLAN_ROOT=$(PWD)
@@ -26,9 +32,6 @@ KBUILD_EXTRA += CONFIG_NO_USE_BACKPORTS=y
 KBUILD_EXTRA += CONFIG_CFG80211_DEPEND_ON_KERNEL=y
 KBUILD_EXTRA += WLAN_OPEN_SOURCE=1
 
-KBUILD_EXTRA += CONFIG_CLD_HL_USB_CORE=y
-#KBUILD_EXTRA := CONFIG_CLD_HL_SDIO_CORE=y
-
 #By default build for CLD
 WLAN_SELECT := CONFIG_QCA_CLD_WLAN=m
 KBUILD_OPTIONS += CONFIG_QCA_WIFI_ISOC=0
@@ -39,8 +42,13 @@ KBUILD_OPTIONS += $(KBUILD_EXTRA) # Extra config if any
 
 .NOTPARALLEL:
 
-all:
-	$(MAKE) -C $(KERNEL_SRC) M=$(shell pwd) modules $(KBUILD_OPTIONS)
+all: wlan-sdio wlan-usb
+
+wlan-sdio:
+	$(MAKE) CONFIG_CLD_HL_SDIO_CORE=y -C $(KERNEL_SRC) M=$(shell pwd) modules $(KBUILD_OPTIONS) MODNAME=wlan-sdio
+
+wlan-usb:
+	$(MAKE) CONFIG_CLD_HL_USB_CORE=y -C $(KERNEL_SRC) M=$(shell pwd) modules $(KBUILD_OPTIONS) MODNAME=wlan-usb
 
 modules_install:
 	$(MAKE) INSTALL_MOD_STRIP=1 -C $(KERNEL_SRC) M=$(shell pwd) modules_install
