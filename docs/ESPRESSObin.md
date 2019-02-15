@@ -19,7 +19,7 @@ The main purpose of this guide is to show, how to get started with Red Bean on E
 
 2. Extract the archive
 
-		tar -xvf gcc-linaro-5.2-2015.11-2-x86_64_aarch64-linux-gnu.tar.xz
+		tar -xf gcc-linaro-5.2-2015.11-2-x86_64_aarch64-linux-gnu.tar.xz
 
 3. Add toolchain to path. Change your path to toolchain accordingly
 
@@ -70,6 +70,8 @@ The main purpose of this guide is to show, how to get started with Red Bean on E
 		Wireless -> Generic IEEE 802.11 Networking Stack (mac80211)
 	
 		Device Drivers -> Network device support -> Wireless LAN
+	
+		General setup -> Kernel->user space relay support (formerly relayfs)
 	Save and exit
 
 7. Start building kernel
