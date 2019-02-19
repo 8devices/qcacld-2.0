@@ -1742,9 +1742,16 @@ endif
 # This allows multiple instances of the driver with different module names.
 # If the module name is wlan, leave MULTI_IF_NAME undefined and the code will
 # treat the driver as the primary driver.
-ifneq ($(MODNAME), wlan)
-CHIP_NAME ?= $(MODNAME)
-CDEFINES += -DMULTI_IF_NAME=\"$(CHIP_NAME)\"
+ifeq ($(MODNAME), wlan)
+else
+	ifeq ($(MODNAME), wlan-sdio)
+	else
+		ifeq ($(MODNAME), wlan-usb)
+		else
+			CHIP_NAME ?= $(MODNAME)
+			CDEFINES += -DMULTI_IF_NAME=\"$(CHIP_NAME)\"
+		endif
+	endif
 endif
 
 # WLAN_HDD_ADAPTER_MAGIC must be unique for all instances of the driver on the
