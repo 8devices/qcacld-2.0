@@ -10,6 +10,7 @@ Drivers Tested on:
 Head over to docs directory for guides and documentation.
 
 Other helpful resources:
+ - [Bluetooth 5 on fluoride](docs/Fluoride.md)
  - [How to create access point](https://wiki.gentoo.org/wiki/Hostapd "How to create access point")
  - [How to use monitor mode](docs/Monitor_mode.md "How to use monitor mode")
  - [How to connect to protected access point](docs/wpa_supplicant_guide.md "How to connect to protected access point")
