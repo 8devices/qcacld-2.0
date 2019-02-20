@@ -17,4 +17,4 @@ How to connect to AP with wpa_supplicant
 
 3. Start wpa_supplicant:
 
-	wpa_supplicant -iwlan0 -c/etc/wpa_supplicant.conf
+		wpa_supplicant -iwlan0 -c/etc/wpa_supplicant.conf
