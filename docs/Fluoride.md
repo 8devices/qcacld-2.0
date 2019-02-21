@@ -5,7 +5,8 @@ This guide will show, how to start Fluoride Bluetooth stack on Linux.
 
  - [Qualcomm official guide](https://developer.qualcomm.com/qfile/35614/80-yc636-1_b_qca6174a_qca9377_wlan_bluetooth_linux_x86_porting_guide.pdf "Qualcomm official guide")
 
-The sources can be downloaded from [Qualcomm developer page](https://developer.qualcomm.com/).
+To download sources, register to [Qualcomm developer page](https://developer.qualcomm.com/).
+Then download it from [QCA9377-3](https://developer.qualcomm.com/hardware/qca9377-x/tools) page.
 
 # Preparation
 

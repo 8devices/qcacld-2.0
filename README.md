@@ -6,6 +6,7 @@ Drivers Tested on:
 
  - [ESPRESSObin board with 4.4.52-armada-17.06.2](docs/ESPRESSObin.md)
  - [NXP BD-SL-i.MX6](docs/NXP-BD-SL-i.MX6.md)
+ - [RaspberryPi](docs/RaspberryPi.md)
 
 Head over to docs directory for guides and documentation.
 
