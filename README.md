@@ -15,4 +15,4 @@ Other helpful resources:
  - [How to create access point](https://wiki.gentoo.org/wiki/Hostapd "How to create access point")
  - [How to use monitor mode](docs/Monitor_mode.md "How to use monitor mode")
  - [How to connect to protected access point](docs/wpa_supplicant_guide.md "How to connect to protected access point")
-
+ - [How to run AP and STA simultaneously](docs/AP_STA_Simultaneously.md "How to run AP and STA simultaneously")
