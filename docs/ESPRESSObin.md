@@ -132,7 +132,7 @@ If the build process finishes successfully, you can find the files in `output/im
 
 1. Download the sources
 
-		git clone https://github.com/8devices/qcacld-2.0
+		git clone https://github.com/8devices/qcacld-2.0 -b caf-wlan/LNX.LEH.4.2.2.2
 		cd qcacld-2.0
 
 2. Edit variables in the make file ARCH, KERNEL_SRC, CROSS_COMPILE accordingly. For example:

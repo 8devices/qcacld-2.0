@@ -19,7 +19,7 @@ Before compiling qcacld drivers for BD-SL-i.MX6, you have to prepare operating s
 
 3. Download qcacld driver:
 
-		git clone https://github.com/8devices/qcacld-2.0
+		git clone https://github.com/8devices/qcacld-2.0 -b caf-wlan/LNX.LEH.4.2.2.2
 
 4. Create an output folder for your build:
 

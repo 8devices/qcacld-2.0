@@ -8,7 +8,7 @@ Before building, make sure that:
 
 Checkout the sources and build the driver:
 
-	git clone https://github.com/8devices/qcacld-2.0
+	git clone https://github.com/8devices/qcacld-2.0 -b caf-wlan/LNX.LEH.4.2.2.2
 	cd qcacld-2.0/
 	make -j4
 

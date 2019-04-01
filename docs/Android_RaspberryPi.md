@@ -20,7 +20,7 @@ Compile qcacld driver for Android on RaspberryPi
 
 4. Checkout qcacld-2.0 drivers
 
-		git clone https://github.com/8devices/qcacld-2.0.git
+		git clone https://github.com/8devices/qcacld-2.0.git -b caf-wlan/LNX.LEH.4.2.2.2
 		cd qcacld-2.0
 
 5. Build qcacld-driver module
