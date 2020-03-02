@@ -8,6 +8,14 @@ Drivers Tested on:
  - [NXP BD-SL-i.MX6](docs/NXP-BD-SL-i.MX6.md)
  - [RaspberryPi](docs/RaspberryPi.md)
 
+The driver supports these kernel versions:
+
+ - v4.4.15
+ - v4.9.11
+ - v4.11
+
+ On other kernel versions the results may vary.
+
 Head over to docs directory for guides and documentation.
 
 Other helpful resources:
