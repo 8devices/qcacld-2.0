@@ -876,7 +876,7 @@ v_TIME_t vos_timer_get_system_ticks( v_VOID_t )
   ------------------------------------------------------------------------*/
 v_TIME_t vos_timer_get_system_time( v_VOID_t )
 {
-   struct timeval tv;
-   do_gettimeofday(&tv);
-   return tv.tv_sec*1000 + tv.tv_usec/1000;
+   struct timespec64 ts;
+   ktime_get_ts64(&ts);
+   return ts.tv_nsec/1000000;
 }
