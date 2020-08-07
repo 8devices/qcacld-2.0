@@ -270,7 +270,11 @@ static void wlan_hdd_restart_deinit(hdd_context_t *pHddCtx);
 void wlan_hdd_restart_timer_cb(v_PVOID_t usrDataForCallback);
 void hdd_set_wlan_suspend_mode(bool suspend);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+v_U16_t hdd_select_queue(struct net_device *dev,
+    struct sk_buff *skb, struct net_device *sb_dev);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 v_U16_t hdd_select_queue(struct net_device *dev, struct sk_buff *skb,
     struct net_device *sb_dev, select_queue_fallback_t fallback);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
@@ -10340,7 +10344,10 @@ static void hdd_set_multicast_list(struct net_device *dev)
   \return - ac, Queue Index/access category corresponding to UP in IP header
 
   --------------------------------------------------------------------------*/
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+v_U16_t hdd_select_queue(struct net_device *dev,
+    struct sk_buff *skb, struct net_device *sb_dev)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 v_U16_t hdd_select_queue(struct net_device *dev,
     struct sk_buff *skb, struct net_device *sb_dev, select_queue_fallback_t fallback)
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 1))
