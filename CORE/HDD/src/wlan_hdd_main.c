@@ -11228,9 +11228,23 @@ boolean hdd_is_5g_supported(hdd_context_t * pHddCtx)
 #define WOW_MAX_FILTERS_PER_LIST 4
 #define WOW_MIN_PATTERN_SIZE     6
 #define WOW_MAX_PATTERN_SIZE     64
+#define WOW_PATTERN_SIZE         256
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+static const struct wiphy_wowlan_support ath6kl_wowlan_support = {
+	.flags = WIPHY_WOWLAN_MAGIC_PKT |
+		 WIPHY_WOWLAN_DISCONNECT |
+		 WIPHY_WOWLAN_GTK_REKEY_FAILURE  |
+		 WIPHY_WOWLAN_SUPPORTS_GTK_REKEY |
+		 WIPHY_WOWLAN_EAP_IDENTITY_REQ   |
+		 WIPHY_WOWLAN_4WAY_HANDSHAKE,
+	.n_patterns = WOW_MAX_FILTERS_PER_LIST,
+	.pattern_min_len = 1,
+	.pattern_max_len = WOW_PATTERN_SIZE,
+};
+
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0))
 static const struct wiphy_wowlan_support ath6kl_wowlan_support = {
     .flags = WIPHY_WOWLAN_ANY |
              WIPHY_WOWLAN_MAGIC_PKT |
@@ -11294,7 +11308,7 @@ static VOS_STATUS wlan_hdd_reg_init(hdd_context_t *hdd_ctx)
    /* registration of wiphy dev with cfg80211 */
    if (0 > wlan_hdd_cfg80211_register(wiphy))
    {
-      hddLog(VOS_TRACE_LEVEL_ERROR,"%s: wiphy register failed", __func__);
+      hddLog(VOS_TRACE_LEVEL_ERROR,"%s:%u: wiphy register failed", __func__, __LINE__);
       status = VOS_STATUS_E_FAILURE;
    }
 
@@ -11951,7 +11965,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    status = wlan_hdd_reg_init(pHddCtx);
    if (status != VOS_STATUS_SUCCESS) {
       hddLog(VOS_TRACE_LEVEL_FATAL,
-             "%s: Failed to init channel list", __func__);
+             "%s:%u: Failed to init channel list", __func__, __LINE__);
       goto err_vosclose;
    }
 #endif
@@ -11989,7 +12003,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    status = hdd_set_sme_chan_list(pHddCtx);
    if (status != VOS_STATUS_SUCCESS) {
       hddLog(VOS_TRACE_LEVEL_FATAL,
-             "%s: Failed to init channel list", __func__);
+             "%s:%u Failed to init channel list", __func__, __LINE__);
       goto err_wiphy_unregister;
    }
 
@@ -12096,7 +12110,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    /* registration of wiphy dev with cfg80211 */
    if (0 > wlan_hdd_cfg80211_register(wiphy))
    {
-       hddLog(VOS_TRACE_LEVEL_ERROR,"%s: wiphy register failed", __func__);
+       hddLog(VOS_TRACE_LEVEL_ERROR,"%s:%u: wiphy register failed", __func__, __LINE__);
        goto err_vosstop;
    }
 #endif
