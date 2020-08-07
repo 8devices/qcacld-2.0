@@ -553,15 +553,14 @@ int hdd_mon_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
       skb->protocol = htons(HDD_ETHERTYPE_802_1_X);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-      hdd_hostapd_select_queue(pPgBkAdapter->dev, skb,
-                               NULL);
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
-      hdd_hostapd_select_queue(pPgBkAdapter->dev, skb,
-                               NULL, NULL);
-#else
-      hdd_hostapd_select_queue(pPgBkAdapter->dev, skb);
+      hdd_hostapd_select_queue(pPgBkAdapter->dev, skb
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0))
+		      , NULL
 #endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) && (LINUX_VERSION_CODE <= KERNEL_VERSION(5,1,0))
+		      , NULL
+#endif
+		      );
       return hdd_softap_hard_start_xmit( skb, pPgBkAdapter->dev );
    }
    else
@@ -2037,7 +2036,6 @@ VOS_STATUS hdd_rx_packet_cbk( v_VOID_t *vosContext,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4,11,0))
    pAdapter->dev->last_rx = jiffies;
 #endif
-
    return status;
 }
 /**============================================================================
@@ -2308,7 +2306,6 @@ VOS_STATUS hdd_rx_packet_cbk(v_VOID_t *vosContext,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4,11,0))
    pAdapter->dev->last_rx = jiffies;
 #endif
-
    return VOS_STATUS_SUCCESS;
 }
 

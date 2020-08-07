@@ -104,7 +104,7 @@ unsigned int forcecard = 0;
 module_param(forcecard, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(forcecard, "Ignore card capabilities information to switch bus mode");
 
-unsigned int debugcccr = 1;
+unsigned int debugcccr = 0;
 module_param(debugcccr, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(debugcccr, "Output this cccr values");
 
@@ -835,7 +835,7 @@ A_STATUS ReinitSDIO(HIF_DEVICE *device)
             err = Func0_CMD52ReadByte(card, SDIO_CCCR_SPEED, &cmd52_resp);
             if (err) {
                 AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("ReinitSDIO: CMD52 read to CCCR speed register failed  : %d \n",err));
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0))
+#ifdef MMC_STATE_HIGHSPEED
                 card->state &= ~MMC_STATE_HIGHSPEED;
 #endif
                 /* no need to break */
@@ -845,7 +845,7 @@ A_STATUS ReinitSDIO(HIF_DEVICE *device)
                     AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("ReinitSDIO: CMD52 write to CCCR speed register failed  : %d \n",err));
                     break;
                 }
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0))
+#ifdef MMC_STATE_HIGHSPEED
                 mmc_card_set_highspeed(card);
 #endif
                 host->ios.timing = MMC_TIMING_SD_HS;
@@ -854,7 +854,7 @@ A_STATUS ReinitSDIO(HIF_DEVICE *device)
         }
 
         /* Set clock */
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0))
+#ifdef MMC_STATE_HIGHSPEED
         if (mmc_card_highspeed(card)) {
 #else
         if (mmc_card_hs(card)) {
@@ -1181,15 +1181,9 @@ hifIRQHandler(struct sdio_func *func)
 
 #ifdef HIF_MBOX_SLEEP_WAR
 static void
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
 HIF_sleep_entry(struct timer_list *t)
 {
     HIF_DEVICE *device = from_timer(device, t, sleep_timer);
-#else
-HIF_sleep_entry(void *arg)
-{
-    HIF_DEVICE *device = (HIF_DEVICE *)arg;
-#endif
     A_UINT32 idle_ms;
 
     idle_ms = adf_os_ticks_to_msecs(adf_os_ticks()
@@ -1444,7 +1438,7 @@ TODO: MMC SDIO3.0 Setting should also be modified in ReInit() function when Powe
             if (mmcclock > 0){
                 clock_set = mmcclock;
             }
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0))
+#ifdef MMC_STATE_HIGHSPEED
             if (mmc_card_highspeed(func->card)){
 #else
             if (mmc_card_hs(func->card)) {
@@ -1516,9 +1510,7 @@ TODO: MMC SDIO3.0 Setting should also be modified in ReInit() function when Powe
                 }
                 AR_DEBUG_PRINTF(ATH_DEBUG_ANY,("%s: Set MMC bus width to %dBit. \n", __func__, mmcbuswidth));
             }
-            if (debugcccr) {
-               HIFDumpCCCR(device);
-            }
+            HIFDumpCCCR(device);
             // Set MMC Bus Mode: 1-SDR12, 2-SDR25, 3-SDR50, 4-DDR50, 5-SDR104
             if (mmcbusmode > 0) {
                 printk("host caps:0x%08X, card_sd3_bus_mode:0x%08X\n", (unsigned int)func->card->host->caps, (unsigned int)func->card->sw_caps.sd3_bus_mode);
@@ -1608,12 +1600,7 @@ TODO: MMC SDIO3.0 Setting should also be modified in ReInit() function when Powe
         sema_init(&device->sem_async, 0);
     }
 #ifdef HIF_MBOX_SLEEP_WAR
-    adf_os_timer_init(NULL, &device->sleep_timer,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
-                         HIF_sleep_entry);
-#else
-                         HIF_sleep_entry, (void *)device);
-#endif
+    timer_setup(&device->sleep_timer, HIF_sleep_entry, 0);
     adf_os_atomic_set(&device->mbox_state, HIF_MBOX_UNKNOWN_STATE);
 #endif
 
@@ -2438,6 +2425,8 @@ static int Func0_CMD52ReadByte(struct mmc_card *card, unsigned int address, unsi
     return err;
 }
 
+#define HIF_DBG_LOG(fmt, arg...) { if (debugcccr) printk(fmt, ## arg); }
+
 void HIFDumpCCCR(HIF_DEVICE *hif_device)
 {
    int i;
@@ -2449,27 +2438,16 @@ void HIFDumpCCCR(HIF_DEVICE *hif_device)
       return;
    }
 
-   printk("HIFDumpCCCR ");
+   HIF_DBG_LOG("HIFDumpCCCR ");
    for (i = 0; i <= 0x16; i ++) {
      err = Func0_CMD52ReadByte(hif_device->func->card, i, &cccr_val);
      if (err) {
          printk("Reading CCCR 0x%02X failed: %d\n", (unsigned int)i, (unsigned int)err);
      } else {
-         printk("%X(%X) ", (unsigned int)i, (unsigned int)cccr_val);
+         HIF_DBG_LOG("%X(%X) ", (unsigned int)i, (unsigned int)cccr_val);
      }
    }
-/*
-   printk("\nHIFDumpCCCR ");
-   for (i = 0xF0; i <= 0xFF; i ++) {
-     err = Func0_CMD52ReadByte(hif_device->func->card, i, &cccr_val);
-     if (err) {
-         printk("Reading CCCR 0x%02X failed: %d\n", (unsigned int)i, (unsigned int)err);
-     } else {
-         printk("0x%02X(%02X)", (unsigned int)i, (unsigned int)cccr_val);
-     }
-   }
-*/
-   printk("\n");
+   HIF_DBG_LOG("\n");
 }
 
 void HIFsuspendwow(HIF_DEVICE *hif_device)

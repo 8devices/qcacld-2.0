@@ -879,7 +879,7 @@ static void ramdump_work_handler(struct work_struct *ramdump)
 	printk("%s: RAM dump collecting completed!\n", __func__);
 	msleep(250);
 #if defined(HIF_SDIO)
-	panic("CNSS Ram dump collected\n");
+	WARN(1, "CNSS Ram dump collected\n");
 #else
 	/* Notify SSR framework the target has crashed. */
 	cnss_device_crashed();
@@ -895,7 +895,7 @@ out_fail:
 #else
 
 #if defined(HIF_SDIO)
-	panic("CNSS Ram dump collection failed \n");
+	WARN(1, "CNSS Ram dump collection failed \n");
 #else
 	cnss_device_crashed();
 #endif
@@ -1782,10 +1782,6 @@ int ol_download_firmware(struct ol_softc *scn)
 		address = BMI_SEGMENTED_WRITE_ADDR;
 		printk("%s: Using 0x%x for the remainder of init\n", __func__, address);
 
-#ifdef CONFIG_NO_OTP
-	printk ("Not loading OTP data\n");
-#else
-
 		if ( scn->enablesinglebinary == FALSE ) {
 			status = ol_transfer_bin_file(scn, ATH_OTP_FILE,
 						      address, TRUE);
@@ -1797,7 +1793,6 @@ int ol_download_firmware(struct ol_softc *scn)
 				return status;
 			}
 		}
-#endif
 	}
 	if (scn->target_version == AR6320_REV1_1_VERSION){
 		/* To disable PCIe use 96 AXI memory as internal buffering,

@@ -110,15 +110,9 @@ static void tryAllowingSleep( VOS_TIMER_TYPE type )
 
   --------------------------------------------------------------------------*/
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0))
-static void vos_linux_timer_callback (struct timer_list *t)
+static void vos_linux_timer_callback(struct timer_list *t)
 {
    vos_timer_t *timer = from_timer(timer, t, platformInfo.Timer);
-#else
-static void vos_linux_timer_callback (unsigned long data)
-{
-   vos_timer_t *timer = ( vos_timer_t *)data;
-#endif
    vos_msg_t msg;
    VOS_STATUS vStatus;
    unsigned long flags;
@@ -449,9 +443,7 @@ VOS_STATUS vos_timer_init_debug( vos_timer_t *timer, VOS_TIMER_TYPE timerType,
    // set the various members of the timer structure
    // with arguments passed or with default values
    spin_lock_init(&timer->platformInfo.spinlock);
-   init_timer(&(timer->platformInfo.Timer));
-   timer->platformInfo.Timer.function = vos_linux_timer_callback;
-   timer->platformInfo.Timer.data = (unsigned long)timer;
+   timer_setup(&timer->platformInfo.Timer, vos_linux_timer_callback, 0);
    timer->callback = callback;
    timer->userData = userData;
    timer->type = timerType;
@@ -477,13 +469,7 @@ VOS_STATUS vos_timer_init( vos_timer_t *timer, VOS_TIMER_TYPE timerType,
    // set the various members of the timer structure
    // with arguments passed or with default values
    spin_lock_init(&timer->platformInfo.spinlock);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0))
    timer_setup(&timer->platformInfo.Timer, vos_linux_timer_callback, 0);
-#else
-   init_timer(&(timer->platformInfo.Timer));
-   timer->platformInfo.Timer.function = vos_linux_timer_callback;
-   timer->platformInfo.Timer.data = (unsigned long)timer;
-#endif
    timer->callback = callback;
    timer->userData = userData;
    timer->type = timerType;
@@ -874,9 +860,35 @@ v_TIME_t vos_timer_get_system_ticks( v_VOID_t )
   \sa
 
   ------------------------------------------------------------------------*/
-v_TIME_t vos_timer_get_system_time( v_VOID_t )
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
+v_TIME_t vos_timer_get_system_time(void)
 {
-   struct timespec64 ts;
-   ktime_get_ts64(&ts);
-   return ts.tv_nsec/1000000;
+	struct timespec64 tv;
+
+	ktime_get_real_ts64(&tv);
+	return tv.tv_sec * 1000 + tv.tv_nsec / 1000000;
 }
+#else
+v_TIME_t vos_timer_get_system_time(void)
+{
+   struct timeval tv;
+   do_gettimeofday(&tv);
+   return tv.tv_sec*1000 + tv.tv_usec/1000;
+}
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
+void vos_timer_get_timeval(struct timeval *tv)
+{
+	struct timespec64 tv_spec;
+
+	ktime_get_real_ts64(&tv_spec);
+	tv->tv_sec = tv_spec.tv_sec;
+	tv->tv_usec = tv_spec.tv_nsec / 1000;
+}
+#else
+void vos_timer_get_timeval(struct timeval *tv)
+{
+	do_gettimeofday(tv);
+}
+#endif

@@ -171,9 +171,11 @@ static int vos_cpu_hotplug_notify(struct notifier_block *block,
    return NOTIFY_OK;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,10,0))
 static struct notifier_block vos_cpu_hotplug_notifier = {
    .notifier_call = vos_cpu_hotplug_notify,
 };
+#endif
 #endif
 
 /*---------------------------------------------------------------------------
@@ -281,8 +283,8 @@ vos_sched_open
   spin_unlock_bh(&pSchedContext->VosTlshimPktFreeQLock);
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4,10,0))
   register_hotcpu_notifier(&vos_cpu_hotplug_notifier);
-#endif
   pSchedContext->cpuHotPlugNotifier = &vos_cpu_hotplug_notifier;
+#endif
 #endif
 
 

@@ -39,17 +39,9 @@
 #define WLAN_CFG_FILE              "wlan/prima/WCNSS_cfg.dat"
 #endif // QCA_WIFI_2_0
 #endif // ANI_CHIPSET
-#elif defined(HIF_USB)
+#else
 #define WLAN_INI_FILE              "wlan/usb_qcom_cfg.ini"
 #define WLAN_CFG_FILE              "wlan/usb_cfg.dat"
-#define WLAN_MAC_FILE              "wlan/usb_wlan_mac.bin"
-#elif defined(HIF_SDIO)
-#define WLAN_INI_FILE              "wlan/sdio_qcom_cfg.ini"
-#define WLAN_CFG_FILE              "wlan/sdio_cfg.dat"
-#define WLAN_MAC_FILE              "wlan/sdio_wlan_mac.bin"
-#else
-#define WLAN_INI_FILE              "wlan/qcom_cfg.ini"
-#define WLAN_CFG_FILE              "wlan/cfg.dat"
 #define WLAN_MAC_FILE              "wlan/wlan_mac.bin"
 #endif // MSM_PLATFORM
 

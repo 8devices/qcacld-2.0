@@ -2247,12 +2247,12 @@ struct wireless_dev* wlan_hdd_add_virtual_intf(
                   enum nl80211_iftype type,
                   struct vif_params *params )
 {
-    struct wireless_dev* wdev;
+	struct wireless_dev* wdev;
 
-    vos_ssr_protect(__func__);
-    wdev = __wlan_hdd_add_virtual_intf(wiphy, name, type, params);
-    vos_ssr_unprotect(__func__);
-    return wdev;
+	vos_ssr_protect(__func__);
+	wdev = __wlan_hdd_add_virtual_intf(wiphy, name, type, params);
+	vos_ssr_unprotect(__func__);
+	return wdev;
 }
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4,1,0))
 struct wireless_dev* wlan_hdd_add_virtual_intf(
