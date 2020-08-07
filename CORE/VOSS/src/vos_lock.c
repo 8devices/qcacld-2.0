@@ -525,7 +525,7 @@ VOS_STATUS vos_wake_lock_acquire(vos_wake_lock_t *pLock)
     wake_lock(pLock);
 #elif defined(CONFIG_NON_QC_PLATFORM)
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC)
-    hif_pm_runtime_get();
+    //hif_pm_runtime_get();
 #endif
 #endif
     return VOS_STATUS_SUCCESS;
@@ -567,7 +567,7 @@ VOS_STATUS vos_wake_lock_release(vos_wake_lock_t *pLock)
     wake_unlock(pLock);
 #elif defined(CONFIG_NON_QC_PLATFORM)
 #if defined(QCA_WIFI_2_0) && !defined(QCA_WIFI_ISOC)
-    hif_pm_runtime_put();
+    //hif_pm_runtime_put();
 #endif
 #endif
     return VOS_STATUS_SUCCESS;
