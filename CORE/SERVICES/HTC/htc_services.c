@@ -305,15 +305,7 @@ A_STATUS HTCConnectService(HTC_HANDLE               HTCHandle,
         adf_os_assert(!pEndpoint->dl_is_polled); /* not currently supported */
 
         if (pEndpoint->ul_is_polled) {
-            adf_os_timer_init(
-                target->osdev,
-                &pEndpoint->ul_poll_timer,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
-                HTCSendCompleteCheckCleanup);
-#else
-                HTCSendCompleteCheckCleanup,
-                pEndpoint);
-#endif
+            timer_setup(&pEndpoint->ul_poll_timer, HTCSendCompleteCheckCleanup, 0);
         }
 
         AR_DEBUG_PRINTF(ATH_DEBUG_SETUP, ("HTC Service:0x%4.4X, ULpipe:%d DLpipe:%d id:%d Ready\n",

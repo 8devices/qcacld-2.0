@@ -353,20 +353,17 @@ ol_tx_pdev_ll_pause_queue_send_all(struct ol_txrx_pdev_t *pdev)
 }
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
-void ol_tx_vdev_ll_pause_queue_timer(struct timer_list *t)
+void ol_tx_vdev_ll_pause_queue_send(struct ol_txrx_vdev_t *vdev)
 {
 #ifdef QCA_SUPPORT_TXRX_VDEV_LL_TXQ
-    struct ol_txrx_vdev_t *vdev = from_timer(vdev, t, ll_pause.timer);
     ol_tx_vdev_ll_pause_queue_send_base(vdev);
 #endif
 }
-#endif
 
-void ol_tx_vdev_ll_pause_queue_send(void *context)
+void ol_tx_vdev_ll_pause_queue_send_timer(struct timer_list *t)
 {
 #ifdef QCA_SUPPORT_TXRX_VDEV_LL_TXQ
-    struct ol_txrx_vdev_t *vdev = (struct ol_txrx_vdev_t *) context;
+    struct ol_txrx_vdev_t *vdev = from_timer(vdev, t, ll_pause.timer);
     ol_tx_vdev_ll_pause_queue_send_base(vdev);
 #endif
 }

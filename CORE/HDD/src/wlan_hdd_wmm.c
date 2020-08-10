@@ -838,7 +838,7 @@ static eHalStatus hdd_wmm_sme_callback (tHalHandle hHal,
       VOS_TRACE( VOS_MODULE_ID_HDD, WMM_TRACE_LEVEL_ERROR,
                  "%s: Setup failed, not a QoS AP",
                  __func__);
-      if (!HDD_WMM_HANDLE_IMPLICIT == pQosContext->handle)
+      if (HDD_WMM_HANDLE_IMPLICIT != pQosContext->handle)
       {
          VOS_TRACE(VOS_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO,
                    "%s: Explicit Qos, notifying userspace",
@@ -1865,17 +1865,19 @@ v_VOID_t hdd_wmm_classify_pkt ( hdd_adapter_t* pAdapter,
 
   @return         : Qdisc queue index
   ===========================================================================*/
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
-v_U16_t hdd_hostapd_select_queue(struct net_device *dev, struct sk_buff *skb,
-                                 struct net_device *sb_dev, select_queue_fallback_t fallback)
-
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
-v_U16_t hdd_hostapd_select_queue(struct net_device * dev, struct sk_buff *skb,
-                                 void *accel_priv, select_queue_fallback_t fallback)
-
+v_U16_t hdd_hostapd_select_queue(struct net_device *dev
+		, struct sk_buff *skb
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,19,0))
+		, struct net_device *sb_dev
 #else
-v_U16_t hdd_hostapd_select_queue(struct net_device * dev, struct sk_buff *skb)
+		, void *accel_priv
 #endif
+#endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) && (LINUX_VERSION_CODE <= KERNEL_VERSION(5,1,0))
+		, select_queue_fallback_t fallback
+#endif
+)
 {
    WLANTL_ACEnumType ac;
    sme_QosWmmUpType up = SME_QOS_WMM_UP_BE;

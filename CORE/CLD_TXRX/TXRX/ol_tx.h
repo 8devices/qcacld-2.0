@@ -51,9 +51,7 @@ ol_tx_ll_queue(ol_txrx_vdev_handle vdev, adf_nbuf_t msdu_list);
 #endif
 
 void ol_tx_vdev_ll_pause_queue_send(void *context);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0))
-void ol_tx_vdev_ll_pause_queue_timer(struct timer_list* t);
-#endif
+void ol_tx_vdev_ll_pause_queue_send_timer(struct timer_list *t);
 
 adf_nbuf_t
 ol_tx_non_std_ll(

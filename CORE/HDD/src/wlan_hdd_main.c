@@ -270,16 +270,19 @@ static void wlan_hdd_restart_deinit(hdd_context_t *pHddCtx);
 void wlan_hdd_restart_timer_cb(v_PVOID_t usrDataForCallback);
 void hdd_set_wlan_suspend_mode(bool suspend);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
-v_U16_t hdd_select_queue(struct net_device *dev, struct sk_buff *skb,
-    struct net_device *sb_dev, select_queue_fallback_t fallback);
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
-v_U16_t hdd_select_queue(struct net_device *dev,
-    struct sk_buff *skb, void *accel_priv, select_queue_fallback_t fallback);
+v_U16_t hdd_select_queue(struct net_device *dev
+		, struct sk_buff *skb
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,19,0))
+		, struct net_device *sb_dev
 #else
-v_U16_t hdd_select_queue(struct net_device *dev,
-    struct sk_buff *skb);
+		, void *accel_priv
 #endif
+#endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) && (LINUX_VERSION_CODE <= KERNEL_VERSION(5,1,0))
+		, select_queue_fallback_t fallback
+#endif
+);
 
 #ifdef WLAN_FEATURE_PACKET_FILTERING
 static void hdd_set_multicast_list(struct net_device *dev);
@@ -10340,16 +10343,19 @@ static void hdd_set_multicast_list(struct net_device *dev)
   \return - ac, Queue Index/access category corresponding to UP in IP header
 
   --------------------------------------------------------------------------*/
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
-v_U16_t hdd_select_queue(struct net_device *dev,
-    struct sk_buff *skb, struct net_device *sb_dev, select_queue_fallback_t fallback)
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 1))
-v_U16_t hdd_select_queue(struct net_device *dev,
-    struct sk_buff *skb, void *accel_priv, select_queue_fallback_t fallback)
+v_U16_t hdd_select_queue(struct net_device *dev
+		, struct sk_buff *skb
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,19,0))
+		, struct net_device *sb_dev
 #else
-v_U16_t hdd_select_queue(struct net_device *dev,
-    struct sk_buff *skb)
+		, void *accel_priv
 #endif
+#endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) && (LINUX_VERSION_CODE <= KERNEL_VERSION(5,1,0))
+		, select_queue_fallback_t fallback
+#endif
+)
 {
    return hdd_wmm_select_queue(dev, skb);
 }
@@ -11770,8 +11776,7 @@ int hdd_wlan_startup(struct device *dev, v_VOID_t *hif_sc)
    status = hdd_parse_config_ini( pHddCtx );
    if ( VOS_STATUS_SUCCESS != status )
    {
-      hddLog(VOS_TRACE_LEVEL_FATAL, "%s: error parsing %s",
-             __func__, WLAN_INI_FILE);
+      printk("%s: error parsing %s", __func__, WLAN_INI_FILE);
       goto err_config;
    }
 
@@ -13030,14 +13035,15 @@ static void __exit hdd_module_exit(void)
    hdd_driver_exit();
 }
 
-#ifdef MODULE
-static int fwpath_changed_handler(const char *kmessage,
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0))
-                                  const struct kernel_param *kp)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
+/* mainline 4,15 - but Android cherry-picked to 4,14 */
+#define KERNEL_PARAM const struct kernel_param
 #else
-                                  struct kernel_param *kp)
+#define KERNEL_PARAM struct kernel_param
 #endif
+
+#ifdef MODULE
+static int fwpath_changed_handler(const char *kmessage, KERNEL_PARAM *kp)
 {
    return param_set_copystring(kmessage, kp);
 }
@@ -13091,8 +13097,7 @@ static int kickstart_driver(void)
   \return - 0 for success, non zero for failure
 
   --------------------------------------------------------------------------*/
-static int fwpath_changed_handler(const char *kmessage,
-                                  struct kernel_param *kp)
+static int fwpath_changed_handler(const char *kmessage, KERNEL_PARAM *kp)
 {
    int ret;
 

@@ -5569,8 +5569,8 @@ hdd_adapter_t* hdd_wlan_create_ap_dev( hdd_context_t *pHddCtx, tSirMacAddr macAd
         vos_mem_copy(pHostapdAdapter->macAddressCurrent.bytes, (void *)macAddr, sizeof(tSirMacAddr));
 
         pHostapdAdapter->offloads_configured = FALSE;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,0))
-        pWlanHostapdDev->priv_destructor = free_netdev;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,12,0))
+        pWlanHostapdDev->priv_destructor = true;
 #else
         pWlanHostapdDev->destructor = free_netdev;
 #endif
