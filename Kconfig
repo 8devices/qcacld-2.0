@@ -12,6 +12,10 @@ config CLD_HL_SDIO_CORE
 	bool "Enable the SDIO support"
 	default n
 
+config CLD_HL_USB_CORE
+	bool "Enable the USB support"
+	default n
+
 config PRIMA_WLAN_BTAMP
 	bool "Enable the Prima WLAN BT-AMP feature"
 	default n
