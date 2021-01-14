@@ -1470,7 +1470,9 @@ VOS_STATUS hdd_rx_packet_cbk(v_VOID_t *vosContext,
    pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
    while (NULL != skb) {
       skb_next = skb->next;
-
+#ifndef cfg80211_is_gratuitous_arp_unsolicited_na
+#define cfg80211_is_gratuitous_arp_unsolicited_na(skb) 0
+#endif
       if (((pHddStaCtx->conn_info.proxyARPService) &&
          cfg80211_is_gratuitous_arp_unsolicited_na(skb)) ||
          vos_is_load_unload_in_progress(VOS_MODULE_ID_VOSS, NULL)) {
