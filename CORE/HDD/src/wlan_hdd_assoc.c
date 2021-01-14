@@ -4788,6 +4788,7 @@ hdd_smeRoamCallback(void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U32 roamId,
                     WLAN_CONTROL_PATH);
                 break;
             }
+        /* fall-through - lost link same as disconnect */
         case eCSR_ROAM_DISASSOCIATED:
             {
                 VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
