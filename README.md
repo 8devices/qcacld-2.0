@@ -8,13 +8,24 @@ Drivers Tested on:
  - [NXP BD-SL-i.MX6](docs/NXP-BD-SL-i.MX6.md)
  - [RaspberryPi](docs/RaspberryPi.md)
 
-The driver supports these kernel versions:
+The driver branches by kernel versions:
+
+Branch [CNSS.LEA.NRT_3.0](https://github.com/8devices/qcacld-2.0/tree/CNSS.LEA.NRT_3.0):
 
  - v4.4.15
  - v4.9.11
  - v4.11
 
- On other kernel versions the results may vary.
+Branch [linux-4.19.y/CNSS.LEA.NRT_3.0](https://github.com/8devices/qcacld-2.0/tree/linux-4.19.y/CNSS.LEA.NRT_3.0):
+
+ - v4.19.x
+
+Branch [linux-5.4.y/CNSS.LEA.NRT_3.0](https://github.com/8devices/qcacld-2.0/tree/linux-5.4.y/CNSS.LEA.NRT_3.0):
+
+ - v5.4.x
+   Works on Ubuntu/20.04/LTS, RaspberryPi that runs Linux v5.4.0 kernel.
+
+ On other kernel versions the results may vary. Pull requests are welcome!
 
 Head over to docs directory for guides and documentation.
 
