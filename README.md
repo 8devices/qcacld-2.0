@@ -24,6 +24,21 @@ Branch [linux-5.4.y/CNSS.LEA.NRT_3.0](https://github.com/8devices/qcacld-2.0/tre
 
  - v5.4.x
    Works on Ubuntu/20.04/LTS, RaspberryPi that runs Linux v5.4.0 kernel.
+   See RaspberryPi instructions below:
+
+```
+$ sudo apt-get install raspberrypi-kernel-headers
+$ git clone https://github.com/8devices/qcacld-2.0.git
+$ cd qcacld-2.0
+$ git checkout linux-5.4.y/CNSS.LEA.NRT_3.0
+$ make -j12
+$ sudo cp wlan-usb.ko /lib/modules/`uname -r`/
+$ sudo cp -r firmware/usb/* /lib/firmware/
+$ sudo modprobe cfg80211
+$ sudo insmod /lib/modules/`uname -r`/wlan-usb.ko
+$ sudo depmod -av
+$ sudo reboot
+```
 
  On other kernel versions the results may vary. Pull requests are welcome!
 
