@@ -864,6 +864,11 @@ struct cfg_hostapd_edca {
 	uint8_t enable;
 };
 
+enum wlan_hdd_vendor_ie_access_policy {
+	WLAN_HDD_VENDOR_IE_ACCESS_NONE = 0,
+	WLAN_HDD_VENDOR_IE_ACCESS_ALLOW_IF_LISTED,
+};
+
 #ifdef WLAN_NL80211_TESTMODE
 enum wlan_hdd_tm_attr
 {
@@ -884,11 +889,6 @@ enum wlan_hdd_tm_cmd
 };
 
 #define WLAN_HDD_TM_DATA_MAX_LEN    5000
-
-enum wlan_hdd_vendor_ie_access_policy {
-	WLAN_HDD_VENDOR_IE_ACCESS_NONE = 0,
-	WLAN_HDD_VENDOR_IE_ACCESS_ALLOW_IF_LISTED,
-};
 
 static const struct nla_policy wlan_hdd_tm_policy[WLAN_HDD_TM_ATTR_MAX + 1] =
 {
@@ -1641,8 +1641,8 @@ static int __is_driver_dfs_capable(struct wiphy *wiphy,
         return -EPERM;
     }
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,4,0)) || \
-    defined (DFS_MASTER_OFFLOAD_IND_SUPPORT) || defined(WITH_BACKPORTS)
+#if defined (DFS_MASTER_OFFLOAD_IND_SUPPORT) && \
+    ((LINUX_VERSION_CODE > KERNEL_VERSION(3,4,0)) || defined(WITH_BACKPORTS))
     dfs_capability = !!(wiphy->flags & WIPHY_FLAG_DFS_OFFLOAD);
 #endif
 
@@ -3598,15 +3598,15 @@ static int wlan_hdd_cfg80211_extscan_set_significant_change(struct wiphy *wiphy,
 	return ret;
 }
 
-static int __wlan_hdd_cfg80211_extscan_get_valid_channels(struct wiphy *wiphy,
+static int ___wlan_hdd_cfg80211_extscan_get_valid_channels(struct wiphy *wiphy,
                                                      struct wireless_dev *wdev,
                                                      const void *data,
-                                                     int data_len)
+                                                     int data_len,
+						     uint32_t *chan_list)
 {
     hdd_context_t *pHddCtx = wiphy_priv(wiphy);
     struct net_device *dev = wdev->netdev;
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-    uint32_t chan_list[WNI_CFG_VALID_CHANNEL_LIST_LEN] = {0};
     uint8_t num_channels  = 0, num_chan_new = 0, buf[256] = {0};
     struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX + 1];
     tANI_U32 requestId, maxChannels;
@@ -3729,6 +3729,24 @@ static int __wlan_hdd_cfg80211_extscan_get_valid_channels(struct wiphy *wiphy,
     return -EINVAL;
 }
 
+
+static int __wlan_hdd_cfg80211_extscan_get_valid_channels(struct wiphy *wiphy,
+                                                     struct wireless_dev *wdev,
+                                                     const void *data,
+                                                     int data_len)
+{
+    uint32_t *chan_list;
+    int status;
+
+    chan_list = kzalloc(WNI_CFG_VALID_CHANNEL_LIST_LEN * sizeof(uint32_t), GFP_ATOMIC);
+    if (!chan_list)
+	    return -ENOMEM;
+
+    status = ___wlan_hdd_cfg80211_extscan_get_valid_channels(wiphy, wdev, data, data_len, chan_list);
+    kfree(chan_list);
+    return status;
+}
+
 /**
  * wlan_hdd_cfg80211_extscan_get_valid_channels() - get ext scan valid channels
  * @wiphy: Pointer to wireless phy
@@ -3831,10 +3849,11 @@ static bool hdd_extscan_channel_max_reached(tSirWifiScanCmdReqParams *req,
 	return false;
 }
 
-static int hdd_extscan_start_fill_bucket_channel_spec(
+static int __hdd_extscan_start_fill_bucket_channel_spec(
 			hdd_context_t *pHddCtx,
 			tpSirWifiScanCmdReqParams pReqMsg,
-			struct nlattr **tb)
+			struct nlattr **tb,
+			uint32_t *chanList)
 {
 	struct nlattr *bucket[
 		QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX + 1];
@@ -3846,7 +3865,6 @@ static int hdd_extscan_start_fill_bucket_channel_spec(
 	eHalStatus status;
 	uint8_t bktIndex, j, numChannels, total_channels = 0;
 	uint32_t expected_buckets;
-	uint32_t chanList[WNI_CFG_VALID_CHANNEL_LIST_LEN] = {0};
 
 	uint32_t min_dwell_time_active_bucket =
 		pHddCtx->cfg_ini->extscan_active_max_chn_time;
@@ -4235,6 +4253,26 @@ static int hdd_extscan_start_fill_bucket_channel_spec(
 				pReqMsg->max_dwell_time_passive);
 
 	return 0;
+}
+
+
+static int hdd_extscan_start_fill_bucket_channel_spec(
+			hdd_context_t *pHddCtx,
+			tpSirWifiScanCmdReqParams pReqMsg,
+			struct nlattr **tb)
+{
+        uint32_t *chanList;
+        int status;
+
+        chanList = kzalloc(WNI_CFG_VALID_CHANNEL_LIST_LEN * sizeof(uint32_t), GFP_ATOMIC);
+        if (!chanList) {
+                return -ENOMEM;
+        }
+
+        status = __hdd_extscan_start_fill_bucket_channel_spec(pHddCtx, pReqMsg, tb, chanList);
+        kfree(chanList);
+
+        return status;
 }
 
 /*
@@ -16780,8 +16818,8 @@ int wlan_hdd_cfg80211_init(struct device *dev,
     wiphy->vendor_events = wlan_hdd_cfg80211_vendor_events;
     wiphy->n_vendor_events = ARRAY_SIZE(wlan_hdd_cfg80211_vendor_events);
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,4,0)) || \
-    defined (DFS_MASTER_OFFLOAD_IND_SUPPORT) || defined(WITH_BACKPORTS)
+#if defined (DFS_MASTER_OFFLOAD_IND_SUPPORT) && \
+    ((LINUX_VERSION_CODE > KERNEL_VERSION(3,4,0)) || defined(WITH_BACKPORTS))
     if (pCfg->enableDFSMasterCap) {
         wiphy->flags |= WIPHY_FLAG_DFS_OFFLOAD;
     }
