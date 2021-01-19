@@ -8434,16 +8434,22 @@ static int __iw_get_char_setnone(struct net_device *dev,
            tHalHandle hal = WLAN_HDD_GET_HAL_CTX(pAdapter);
            eCsrPhyMode phymode;
            eCsrBand currBand;
-           tSmeConfigParams smeconfig;
+           tSmeConfigParams *smeconfig;
 
-           sme_GetConfigParam(hal, &smeconfig);
+           smeconfig = kzalloc(sizeof(*smeconfig), GFP_ATOMIC);
+           if (!smeconfig)
+                   return -EIO;
+
+           sme_GetConfigParam(hal, smeconfig);
            if (WNI_CFG_CHANNEL_BONDING_MODE_DISABLE !=
-                                  smeconfig.csrConfig.channelBondingMode24GHz)
+                                  smeconfig->csrConfig.channelBondingMode24GHz)
                ch_bond24 = VOS_TRUE;
 
            if (WNI_CFG_CHANNEL_BONDING_MODE_DISABLE !=
-                                  smeconfig.csrConfig.channelBondingMode5GHz)
+                                  smeconfig->csrConfig.channelBondingMode5GHz)
                ch_bond5g = VOS_TRUE;
+
+           kfree(smeconfig);
 
            phymode = sme_GetPhyMode(hal);
            if ((eHAL_STATUS_SUCCESS != sme_GetFreqBand(hal, &currBand))) {
