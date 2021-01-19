@@ -5383,7 +5383,7 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 	wmi_radio_link_stats *radio_stats;
 	wmi_channel_stats *channel_stats;
 	tSirLLStatsResults *link_stats_results;
-	tSirWifiRadioStat *rs_results;
+	tSirWifiRadioStat *rs_results = NULL;
 	tSirWifiChannelStats *chn_results;
 	uint8_t *results, *t_radio_stats, *t_channel_stats;
 	uint32_t next_chan_offset, count;
@@ -5464,10 +5464,18 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 		 * events may be spoofed. Drop all of them and report error.
 		 */
 		WMA_LOGE("Invalid following WMI_RADIO_LINK_STATS_EVENTID. Discarding this set");
-		rs_results->tx_time_per_power_level = NULL;
 		vos_mem_free(wma_handle->link_stats_results);
 		wma_handle->link_stats_results = NULL;
-		vos_mem_free(rs_results->tx_time_per_power_level);
+
+		/*
+		 * Hmm, at this point rs_results is always NULL,
+		 * I think this code can be deleted.
+		 */
+		if (rs_results != NULL) {
+			vos_mem_free(rs_results->tx_time_per_power_level);
+			rs_results->tx_time_per_power_level = NULL;
+		}
+
 		return -EINVAL;
 	}
 
