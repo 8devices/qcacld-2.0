@@ -143,7 +143,6 @@ static int vos_sched_find_attach_cpu(pVosSchedContext pSchedContext,
 	unsigned char litl_core_count = 0;
 	int vosMaxClusterId = 0;
 #if defined(WLAN_OPEN_SOURCE) && (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
-	struct cpumask litl_mask;
 	unsigned long cpus;
 	int i;
 #endif
@@ -229,18 +228,26 @@ static int vos_sched_find_attach_cpu(pVosSchedContext pSchedContext,
 	} else {
 
 #if defined(WLAN_OPEN_SOURCE) && (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
+		cpumask_t *litl_mask;
+
+		litl_mask = kzalloc(cpumask_size(), GFP_ATOMIC);
+		if (!litl_mask)
+			goto err;
+
 		/* Attach to any little core
 		 * Final decision should made by scheduler */
 
-		cpumask_clear(&litl_mask);
+		cpumask_clear(litl_mask);
 		for (i = 0;
 			i < litl_core_count;
 			i++) {
-			cpumask_set_cpu(online_litl_cpu[i], &litl_mask);
+			cpumask_set_cpu(online_litl_cpu[i], litl_mask);
 		}
 
-		set_cpus_allowed_ptr(pSchedContext->TlshimRxThread, &litl_mask);
+		set_cpus_allowed_ptr(pSchedContext->TlshimRxThread, litl_mask);
 		pSchedContext->rx_thread_cpu = 0;
+
+		kfree(litl_mask);
 #else
 		/* Attach RX thread to last little core CPU */
 		if (pSchedContext->rx_thread_cpu !=
