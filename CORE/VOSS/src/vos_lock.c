@@ -527,9 +527,11 @@ VOS_STATUS vos_wake_lock_init(vos_wake_lock_t *pLock, const char *name)
 
 static const char* vos_wake_lock_name(vos_wake_lock_t *pLock)
 {
+#ifdef CONFIG_PM_SLEEP
 	if ((pLock->is_initialized) && (pLock->lock.name))
 		return pLock->lock.name;
 	else
+#endif
 		return "UNNAMED_WAKELOCK";
 }
 
