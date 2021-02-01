@@ -1992,14 +1992,16 @@ ol_tx_vdev_set_bundle_require(uint8_t vdev_id, unsigned long tx_bytes,
 {
 	struct ol_txrx_vdev_t* vdev = ol_txrx_get_vdev_from_vdev_id(vdev_id);
 	bool old_bundle_required;
+	uint64_t tx_bits_high = (high_th * time_in_ms * 1500);
+	uint64_t tx_bits_low = (low_th * time_in_ms * 1500);
 
 	if ((!vdev) || (low_th > high_th))
 		return;
 
 	old_bundle_required = vdev->bundling_reqired;
-	if (tx_bytes > ((high_th * time_in_ms * 1500)/1000))
+	if (tx_bytes > vos_do_div(tx_bits_high,1000))
 		vdev->bundling_reqired = true;
-	else if (tx_bytes < ((low_th * time_in_ms * 1500)/1000))
+	else if (tx_bytes < vos_do_div(tx_bits_low,1000))
 		vdev->bundling_reqired = false;
 
 	if (old_bundle_required != vdev->bundling_reqired)
