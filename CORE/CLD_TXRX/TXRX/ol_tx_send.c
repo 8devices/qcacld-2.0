@@ -859,7 +859,7 @@ ol_tx_dump_group_credit_stats(ol_txrx_pdev_handle pdev)
 {
     uint16 i,j, is_break = 0;
     int16 curr_index, old_index, wrap_around;
-    uint16 curr_credit, old_credit, mem_vdevs;
+    uint16 curr_credit, old_credit = 0, mem_vdevs;
 
     VOS_TRACE(VOS_MODULE_ID_TXRX, VOS_TRACE_LEVEL_ERROR,"Group credit stats:");
     VOS_TRACE(VOS_MODULE_ID_TXRX, VOS_TRACE_LEVEL_ERROR,
