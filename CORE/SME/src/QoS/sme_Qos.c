@@ -4966,7 +4966,7 @@ eHalStatus sme_QosProcessHandoffAssocReqEv(tpAniSirGlobal pMac, v_U8_t sessionId
                break;
             }
 #endif
-            /* fall through */
+            fallthrough;
 
          case SME_QOS_CLOSED:
          case SME_QOS_INIT:
@@ -7114,7 +7114,7 @@ eHalStatus sme_QosReassocSuccessEvFnp(tpAniSirGlobal pMac, tListElem *pEntry)
       break;
    case SME_QOS_REASON_RELEASE:
       pACInfo->num_flows[SME_QOS_TSPEC_INDEX_0]--;
-      // fall through
+      fallthrough;
    case SME_QOS_REASON_MODIFY:
       delete_entry = VOS_TRUE;
       break;
@@ -7161,7 +7161,7 @@ eHalStatus sme_QosReassocSuccessEvFnp(tpAniSirGlobal pMac, tListElem *pEntry)
       break;
    case SME_QOS_REASON_REQ_SUCCESS:
       hdd_status = SME_QOS_STATUS_SETUP_MODIFIED_IND;
-      // fall through
+      fallthrough;
    default:
       delete_entry = VOS_FALSE;
       break;
@@ -7250,7 +7250,7 @@ eHalStatus sme_QosAddTsFailureFnp(tpAniSirGlobal pMac, tListElem *pEntry)
       break;
    case SME_QOS_REASON_MODIFY:
       flow_info->reason = SME_QOS_REASON_REQ_SUCCESS;
-      /* fall through */
+      fallthrough;
    case SME_QOS_REASON_REQ_SUCCESS:
    default:
       inform_hdd = VOS_FALSE;
@@ -7474,7 +7474,7 @@ eHalStatus sme_QosAddTsSuccessFnp(tpAniSirGlobal pMac, tListElem *pEntry)
    case SME_QOS_REASON_REQ_SUCCESS:
       hdd_status = SME_QOS_STATUS_SETUP_MODIFIED_IND;
       inform_hdd = VOS_TRUE;
-      /* fall through */
+      fallthrough;
    default:
       delete_entry = VOS_FALSE;
       break;

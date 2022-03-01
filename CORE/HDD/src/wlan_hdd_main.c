@@ -12118,6 +12118,8 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *hdd_ctx,
 		 /* Reset locally administered bit if the device mode is STA */
 		WLAN_HDD_RESET_LOCALLY_ADMINISTERED_BIT(mac_addr);
 	/* fall through */
+		fallthrough;
+
 	case WLAN_HDD_P2P_CLIENT:
 	case WLAN_HDD_P2P_DEVICE:
 	case WLAN_HDD_OCB:

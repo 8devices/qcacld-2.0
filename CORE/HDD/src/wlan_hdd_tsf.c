@@ -487,7 +487,7 @@ static void hdd_update_timestamp(hdd_adapter_t *adapter,
 		 * If reach MAX_CONTINUOUS_ERROR_CNT, treat it as a
 		 * valid pair
 		 */
-		/* fall-through */
+		fallthrough;
 	case HDD_TS_STATUS_READY:
 		adapter->last_target_time = adapter->cur_target_time;
 		adapter->last_host_time = adapter->cur_host_time;

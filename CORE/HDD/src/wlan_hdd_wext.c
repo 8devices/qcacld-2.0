@@ -10149,7 +10149,7 @@ static int __iw_set_host_offload(struct net_device *dev,
                     break;
                 case WLAN_OFFLOAD_ARP_AND_BC_FILTER_ENABLE:
                     hddLog(VOS_TRACE_LEVEL_WARN, "   BC Filtering enable");
-                    /* fall-through */
+                    fallthrough;
                 case WLAN_OFFLOAD_ENABLE:
                     hddLog(VOS_TRACE_LEVEL_WARN, "   ARP offload enable");
                     hddLog(VOS_TRACE_LEVEL_WARN, "   IP address: %d.%d.%d.%d",
