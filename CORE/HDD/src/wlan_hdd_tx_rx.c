@@ -953,7 +953,7 @@ static void __hdd_tx_timeout(struct net_device *dev)
  *
  * Return: none
  */
-void hdd_tx_timeout(struct net_device *dev)
+void hdd_tx_timeout(struct net_device *dev, unsigned int txqueue)
 {
 	vos_ssr_protect(__func__);
 	__hdd_tx_timeout(dev);

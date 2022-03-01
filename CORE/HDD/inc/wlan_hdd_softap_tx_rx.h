@@ -78,7 +78,7 @@ extern int hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *de
   @param dev : [in] pointer to Libra network device
   @return    : None
   ===========================================================================*/
-extern void hdd_softap_tx_timeout(struct net_device *dev);
+extern void hdd_softap_tx_timeout(struct net_device *dev, unsigned int txqueue);
 
 /**============================================================================
   @brief hdd_softap_stats() - Function registered with the Linux OS for

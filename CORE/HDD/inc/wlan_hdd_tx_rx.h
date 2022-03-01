@@ -119,7 +119,7 @@ extern void hdd_drop_skb_list(hdd_adapter_t *adapter, struct sk_buff *skb,
   @param dev : [in] pointer to Libra network device
   @return    : None
   ===========================================================================*/
-extern void hdd_tx_timeout(struct net_device *dev);
+extern void hdd_tx_timeout(struct net_device *dev, unsigned int txqueue);
 
 /**============================================================================
   @brief hdd_stats() - Function registered with the Linux OS for
