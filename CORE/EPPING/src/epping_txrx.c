@@ -143,7 +143,7 @@ end:
    return;
 }
 
-void epping_tx_queue_timeout(struct net_device *dev)
+void epping_tx_queue_timeout(struct net_device *dev, unsigned int txqueue)
 {
    epping_adapter_t *pAdapter;
 
