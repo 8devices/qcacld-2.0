@@ -159,11 +159,6 @@ static inline int vos_wlan_pm_control(bool vote)
 static inline void vos_lock_pm_sem(void) { return; }
 static inline void vos_release_pm_sem(void) { return; }
 
-static inline void vos_get_boottime_ts(struct timespec *ts)
-{
-	ktime_get_ts(ts);
-}
-
 static inline void *vos_get_virt_ramdump_mem(struct device *dev,
 						unsigned long *size)
 {
