@@ -308,11 +308,15 @@ int wlan_log_to_user(VOS_TRACE_LEVEL log_level, char *to_be_sent, int length)
 		 */
 		pr_info("R%d: %s\n", radio, to_be_sent);
 	} else {
-
 		/* Format the Log time R#: [hr:min:sec.microsec] */
+#if 1
+		struct timespec64 ts;
+		ktime_get_ts64(&ts);
+#else
 		vos_timer_get_timeval(&tv);
+#endif
 		/* Convert rtc to local time */
-		local_time = (u32)(tv.tv_sec - (sys_tz.tz_minuteswest * 60));
+		local_time = (u32)(ts.tv_sec - (sys_tz.tz_minuteswest * 60));
 		rtc_time_to_tm(local_time, &tm);
 		tlen = snprintf(tbuf, sizeof(tbuf),
 				"R%d: [%s][%02d:%02d:%02d.%06lu] ",
