@@ -2445,7 +2445,7 @@ __adf_nbuf_validate_skb_cb(void)
 	 * 48 byte.
 	 */
 	BUILD_BUG_ON(sizeof(struct cvg_nbuf_cb) >
-		FIELD_SIZEOF(struct sk_buff, cb));
+		sizeof_field(struct sk_buff, cb));
 }
 
 /**
