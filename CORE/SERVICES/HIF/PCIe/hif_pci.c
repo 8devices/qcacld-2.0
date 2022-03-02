@@ -1034,7 +1034,7 @@ HIFMapServiceToPipe(HIF_DEVICE *hif_device, a_uint16_t ServiceId, a_uint8_t *ULP
                 *DLPipe = 1;
                 break;
             }
-            /* fall through */
+            fallthrough;
         case WMI_DATA_BE_SVC:
         case WMI_DATA_VI_SVC:
         case WMI_DATA_VO_SVC:
