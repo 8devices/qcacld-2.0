@@ -172,9 +172,11 @@ int _readwrite_file(const char *filename, char *rbuf,
 {
 	int ret = 0;
 	struct file *filp = (struct file *)-ENOENT;
+#ifdef CONFIG_SET_FS
 	mm_segment_t oldfs;
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
+#endif
 
 	do {
 		filp = filp_open(filename, mode, S_IRUSR);
@@ -229,7 +231,9 @@ int _readwrite_file(const char *filename, char *rbuf,
 	if (!IS_ERR(filp))
 		filp_close(filp, NULL);
 
+#ifdef CONFIG_SET_FS
 	set_fs(oldfs);
+#endif
 	return ret;
 }
 
