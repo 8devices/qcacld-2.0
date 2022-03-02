@@ -30,7 +30,7 @@
 #include <crypto/hash.h>
 #include <crypto/aes.h>
 #include <crypto/skcipher.h>
-#include <crypto/sha.h>
+// #include <crypto/sha.h>
 
 /* Preprocessor definitions and constants */
 
