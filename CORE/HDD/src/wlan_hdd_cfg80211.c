@@ -17584,6 +17584,10 @@ int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter)
     wlan_hdd_add_extra_ie(pHostapdAdapter, genie, &total_ielen,
                           WLAN_EID_INTERWORKING);
 
+#ifndef WLAN_EID_VHT_TX_POWER_ENVELOPE
+#define WLAN_EID_VHT_TX_POWER_ENVELOPE WLAN_EID_TX_POWER_ENVELOPE
+#endif
+
     wlan_hdd_add_extra_ie(pHostapdAdapter, genie, &total_ielen,
                           WLAN_EID_VHT_TX_POWER_ENVELOPE);
     if (0 != wlan_hdd_add_ie(pHostapdAdapter, genie,
