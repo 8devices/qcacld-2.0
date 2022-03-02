@@ -17584,7 +17584,7 @@ int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter)
     wlan_hdd_add_extra_ie(pHostapdAdapter, genie, &total_ielen,
                           WLAN_EID_INTERWORKING);
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(5,13,0)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5,14,0)
 #define WLAN_EID_VHT_TX_POWER_ENVELOPE WLAN_EID_TX_POWER_ENVELOPE
 #endif
 
