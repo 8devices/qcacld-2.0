@@ -87,10 +87,10 @@ static int pktlog_release(struct inode *i, struct file *f);
 static ssize_t pktlog_read(struct file *file, char *buf, size_t nbytes,
 			   loff_t * ppos);
 
-static struct file_operations pktlog_fops = {
-	open:pktlog_open,
-	release:pktlog_release,
-	read:pktlog_read,
+static struct proc_ops pktlog_fops = {
+	.proc_open    = pktlog_open,
+	.proc_read    = pktlog_read,
+	.proc_release = pktlog_release,
 };
 
 /*
