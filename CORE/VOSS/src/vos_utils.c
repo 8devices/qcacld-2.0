@@ -64,6 +64,7 @@
 #include <linux/random.h>
 #if(LINUX_VERSION_CODE >= KERNEL_VERSION(4,8,0))
 #include <crypto/skcipher.h>
+#include <crypto/internal/cipher.h>
 #else
 #include <linux/crypto.h>
 #endif

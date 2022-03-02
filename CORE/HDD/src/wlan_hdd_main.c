@@ -21172,6 +21172,7 @@ module_exit(hdd_module_exit);
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Qualcomm Atheros, Inc.");
 MODULE_DESCRIPTION("WLAN HOST DEVICE DRIVER");
+MODULE_IMPORT_NS(CRYPTO_INTERNAL);
 
 #if !defined(QCA_WIFI_FTM)
 static const struct kernel_param_ops con_mode_ops = {
