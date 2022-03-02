@@ -510,9 +510,6 @@ vos_sched_open
 )
 {
   VOS_STATUS  vStatus = VOS_STATUS_SUCCESS;
-#ifdef CONFIG_PERF_NON_QC_PLATFORM
-  struct sched_param param = {.sched_priority = 99};
-#endif
 /*-------------------------------------------------------------------------*/
   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
              "%s: Opening the VOSS Scheduler",__func__);
@@ -604,7 +601,8 @@ vos_sched_open
                                                  pSchedContext,
                                                  "VosTlshimRxThread");
 #ifdef CONFIG_PERF_NON_QC_PLATFORM
-  sched_setscheduler(pSchedContext->TlshimRxThread, SCHED_FIFO, &param);
+  // sched_setscheduler(pSchedContext->TlshimRxThread, SCHED_FIFO, &param);
+  sched_set_fifo(pSchedContext->TlshimRxThread);
 #endif
   if (IS_ERR(pSchedContext->TlshimRxThread))
   {

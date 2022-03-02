@@ -883,9 +883,6 @@ static inline void hif_free_bus_request(HIF_DEVICE *device,
  */
 static inline int hif_start_tx_completion_thread(HIF_DEVICE *device)
 {
-#ifdef CONFIG_PERF_NON_QC_PLATFORM
-	struct sched_param param = {.sched_priority = 99};
-#endif
 	if (!device->tx_completion_task) {
 		device->tx_completion_req = NULL;
 		device->last_tx_completion = &device->tx_completion_req;
@@ -893,7 +890,7 @@ static inline int hif_start_tx_completion_thread(HIF_DEVICE *device)
 		device->tx_completion_task = kthread_create(tx_completion_task,
 			(void *)device,	"AR6K TxCompletion");
 #ifdef CONFIG_PERF_NON_QC_PLATFORM
-		sched_setscheduler(device->tx_completion_task, SCHED_FIFO, &param);
+		sched_set_fifo(device->tx_completion_task);
 #endif
 		if (IS_ERR(device->tx_completion_task)) {
 			device->tx_completion_shutdown = 1;
@@ -2149,9 +2146,6 @@ static A_STATUS hifDisableFunc(HIF_DEVICE *device, struct sdio_func *func)
 static A_STATUS hifEnableFunc(HIF_DEVICE *device, struct sdio_func *func)
 {
     int ret = A_OK;
-#ifdef CONFIG_PERF_NON_QC_PLATFORM
-    struct sched_param param = {.sched_priority = 99};
-#endif
     ENTER("sdio_func 0x%pK", func);
 
     AR_DEBUG_PRINTF(ATH_DEBUG_TRACE, ("AR6000: +hifEnableFunc\n"));
@@ -2263,7 +2257,7 @@ static A_STATUS hifEnableFunc(HIF_DEVICE *device, struct sdio_func *func)
                                            (void *)device,
                                            "AR6K Async");
 #ifdef CONFIG_PERF_NON_QC_PLATFORM
-           sched_setscheduler(device->async_task, SCHED_FIFO, &param);
+	   sched_set_fifo(device->async_task);
 #endif
            if (IS_ERR(device->async_task)) {
                AR_DEBUG_PRINTF(ATH_DEBUG_ERROR, ("AR6000: %s(), to create async task\n", __FUNCTION__));

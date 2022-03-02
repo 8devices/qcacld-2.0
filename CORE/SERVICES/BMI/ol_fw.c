@@ -1505,8 +1505,8 @@ int ol_copy_ramdump(struct ol_softc *scn)
 		goto out;
 	}
 
-	vos_request_pm_qos_type(PM_QOS_CPU_DMA_LATENCY,
-				DISABLE_KRAIT_IDLE_PS_VAL);
+	// vos_request_pm_qos_type(PM_QOS_CPU_DMA_LATENCY,
+	//			DISABLE_KRAIT_IDLE_PS_VAL);
 	ret = ol_target_coredump(scn, scn->ramdump_base, scn->ramdump_size);
 	vos_remove_pm_qos();
 
