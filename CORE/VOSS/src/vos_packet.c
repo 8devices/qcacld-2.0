@@ -331,7 +331,7 @@ void vos_pkt_trace_buf_update
 )
 {
    v_U32_t slot;
-   struct timeval tv;
+   struct timespec64 ts;
 
    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
              "%s %d, %s", __func__, __LINE__, event_string);
@@ -347,9 +347,16 @@ void vos_pkt_trace_buf_update
    trace_buffer[slot].order = trace_buffer_order;
    trace_buffer_order++;
    adf_os_spin_unlock_bh(&trace_buffer_lock);
+#if 0
    vos_timer_get_timeval(&tv);
    trace_buffer[slot].event_sec_time = tv.tv_sec;
    trace_buffer[slot].event_msec_time = tv.tv_usec;
+#else
+   ktime_get_real_ts64(&ts);
+
+   trace_buffer[slot].event_sec_time = ts.tv_sec;
+   trace_buffer[slot].event_msec_time = ts.tv_nsec/1000;
+#endif
    strlcpy(trace_buffer[slot].event_string, event_string,
           sizeof(trace_buffer[slot].event_string));
 
@@ -369,7 +376,7 @@ void vos_pkt_trace_dump_slot_buf(int slot)
 
 	local_time = (u32)(trace_buffer[slot].event_sec_time -
 		(sys_tz.tz_minuteswest * 60));
-	rtc_time_to_tm(local_time, &tm);
+	tm = rtc_ktime_to_tm(local_time);
 	VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
 		"%5d : [%02d:%02d:%02d.%06lu] : %s",
 		trace_buffer[slot].order,

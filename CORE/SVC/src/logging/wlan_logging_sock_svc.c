@@ -282,9 +282,7 @@ int wlan_log_to_user(VOS_TRACE_LEVEL log_level, char *to_be_sent, int length)
 	int total_log_len;
 	unsigned int *pfilled_length;
 	bool wake_up_thread = false;
-	struct timeval tv;
 	struct rtc_time tm;
-	unsigned long local_time;
 	int radio;
 
 	radio = vos_get_radio_index();
@@ -312,9 +310,17 @@ int wlan_log_to_user(VOS_TRACE_LEVEL log_level, char *to_be_sent, int length)
 #if 1
 		struct timespec64 ts;
 		ktime_get_ts64(&ts);
+
+		tm = rtc_ktime_to_tm(ktime_get_real());
+		tlen = snprintf(tbuf, sizeof(tbuf),
+				"R%d: [%s][%02d:%02d:%02d.%06lu] ",
+				radio, current->comm, tm.tm_hour,
+				tm.tm_min, tm.tm_sec, ts.tv_nsec/1000);
 #else
+		struct timeval tv;
+		unsigned long local_time;
+
 		vos_timer_get_timeval(&tv);
-#endif
 		/* Convert rtc to local time */
 		local_time = (u32)(ts.tv_sec - (sys_tz.tz_minuteswest * 60));
 		rtc_time_to_tm(local_time, &tm);
@@ -322,6 +328,7 @@ int wlan_log_to_user(VOS_TRACE_LEVEL log_level, char *to_be_sent, int length)
 				"R%d: [%s][%02d:%02d:%02d.%06lu] ",
 				radio, current->comm, tm.tm_hour,
 				tm.tm_min, tm.tm_sec, tv.tv_usec);
+#endif
 
 		/* 1+1 indicate '\n'+'\0' */
 		total_log_len = length + tlen + 1 + 1;

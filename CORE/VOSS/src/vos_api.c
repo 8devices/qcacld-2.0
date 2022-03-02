@@ -3247,10 +3247,14 @@ void vos_svc_fw_shutdown_ind(struct device *dev)
 
 v_U64_t vos_get_monotonic_boottime_ns(void)
 {
+#if 1
+	return ktime_get_boottime();
+#else
 	struct timespec ts;
 
 	ktime_get_ts(&ts);
 	return timespec_to_ns(&ts);
+#endif
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))

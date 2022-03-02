@@ -883,6 +883,7 @@ v_TIME_t vos_timer_get_system_time(void)
 }
 #endif
 
+#if 0
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
 void vos_timer_get_timeval(struct timeval *tv)
 {
@@ -897,6 +898,7 @@ void vos_timer_get_timeval(struct timeval *tv)
 {
 	do_gettimeofday(tv);
 }
+#endif
 #endif
 
 /**
@@ -913,7 +915,7 @@ unsigned long vos_get_time_of_the_day_ms(void)
 
 	ktime_get_real_ts64(&tv);
 	local_time = (unsigned long)(tv.tv_sec - (sys_tz.tz_minuteswest * 60));
-	rtc_time_to_tm(local_time, &tm);
+	tm = rtc_ktime_to_tm(local_time);
 
 	return (tm.tm_hour * 60 * 60 * 1000) +
 		(tm.tm_min * 60 * 1000) + (tm.tm_sec * 1000) +
@@ -948,7 +950,7 @@ void vos_get_time_of_the_day_in_hr_min_sec_usec(char *tbuf, int len)
 	ktime_get_real_ts64(&tv);
 	/* Convert rtc to local time */
 	local_time = (u32)(tv.tv_sec - (sys_tz.tz_minuteswest * 60));
-	rtc_time_to_tm(local_time, &tm);
+	tm = rtc_ktime_to_tm(local_time);
 	scnprintf(tbuf, len,
 		  "[%02d:%02d:%02d.%06lu]",
 		  tm.tm_hour, tm.tm_min, tm.tm_sec, tv.tv_nsec / 1000);
