@@ -9828,6 +9828,13 @@ void csrRoamJoinedStateMsgProcessor( tpAniSirGlobal pMac, void *pMsgBuf )
             smsLog( pMac, LOG1, FL("ASSOCIATION confirmation can be given to upper layer "));
             pUpperLayerAssocCnf = (tSirSmeAssocIndToUpperLayerCnf *)pMsgBuf;
             status = csrRoamGetSessionIdFromBSSID( pMac, (tCsrBssid *)pUpperLayerAssocCnf->bssId, &sessionId );
+	    if (status) {
+                smsLog(pMac, LOGE, FL("  session not found "));
+                if (pUpperLayerAssocCnf->ies)
+                    vos_mem_free(pUpperLayerAssocCnf->ies);
+                return;
+	    }
+
             pSession = CSR_GET_SESSION(pMac, sessionId);
 
             if(!pSession)
@@ -17918,7 +17925,12 @@ eHalStatus csrGetSnr(tpAniSirGlobal pMac,
       return status;
    }
 
-   csrRoamGetSessionIdFromBSSID(pMac, (tCsrBssid *)bssId, &sessionId);
+   status = csrRoamGetSessionIdFromBSSID(pMac, (tCsrBssid *)bssId, &sessionId);
+   if (status)
+   {
+      vos_mem_free((v_VOID_t *)pMsg);
+      return status;
+   }
 
    pMsg->msgType = pal_cpu_to_be16((tANI_U16)eWNI_SME_GET_SNR_REQ);
    pMsg->msgLen = (tANI_U16)sizeof(tAniGetSnrReq);
