@@ -8713,6 +8713,12 @@ static int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,15,0)
+static int hdd_siocdevprivate(struct net_device *dev, struct ifreq *ifr, void __user *data, int cmd)
+{
+	return hdd_ioctl(dev, ifr, cmd);
+}
+#endif
 
 /*
  * Mac address for multiple virtual interface is found as following
@@ -10985,6 +10991,9 @@ static struct net_device_ops wlan_drv_ops = {
       .ndo_tx_timeout = hdd_tx_timeout,
       .ndo_get_stats = hdd_stats,
       .ndo_do_ioctl = hdd_ioctl,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,15,0)
+      .ndo_siocdevprivate = hdd_siocdevprivate,
+#endif
       .ndo_set_mac_address = hdd_set_mac_address,
       .ndo_select_queue    = hdd_select_queue,
 #ifdef WLAN_FEATURE_PACKET_FILTERING
